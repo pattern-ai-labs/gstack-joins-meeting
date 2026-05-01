@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="256" height="256"
+     role="img" aria-label="Design Partner avatar">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#f0abfc" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#0a0a0b" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+  <circle cx="100" cy="100" r="100" fill="#0a0a0b"/>
+  <circle cx="100" cy="100" r="98" fill="url(#bg)"/>
+  <circle cx="100" cy="100" r="98" fill="none"
+          stroke="#f0abfc" stroke-opacity="0.35" stroke-width="2"/>
+  <text x="100" y="100"
+        font-family="JetBrains Mono, ui-monospace, monospace"
+        font-size="96" font-weight="700"
+        fill="#f0abfc" text-anchor="middle" dominant-baseline="central">✦</text>
+</svg>

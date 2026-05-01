@@ -1,0 +1,2101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>gstack × AgentCall — your engineering team, on the call</title>
+    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin />
+    <link
+      href="https://fonts.bunny.net/css?family=inter:400,500,600,700|jetbrains-mono:400,500,600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0a0b;
+        --bg-raised: #111114;
+        --bg-card: rgba(22, 22, 26, 0.72);
+        --border: rgba(255, 255, 255, 0.08);
+        --border-strong: rgba(255, 255, 255, 0.16);
+        --text: #f5f5f7;
+        --text-muted: #8b8b94;
+        --text-dim: #5a5a62;
+        --accent: #9dff6b;         /* electric lime */
+        --accent-ink: #0a0a0b;
+        --accent-glow: rgba(157, 255, 107, 0.18);
+        --green: #4ade80;
+        --amber: #fbbf24;
+        --grey: #545460;
+        --radius: 14px;
+        --radius-lg: 18px;
+        --radius-pill: 999px;
+        --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
+          0 1px 2px rgba(0, 0, 0, 0.4);
+        --shadow-lift: 0 10px 40px -12px rgba(0, 0, 0, 0.7),
+          0 1px 0 rgba(255, 255, 255, 0.06) inset;
+        --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", system-ui, -apple-system, Segoe UI, sans-serif;
+        font-feature-settings: "cv11", "ss01";
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        min-height: 100vh;
+      }
+
+      /* Ambient background */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(
+            ellipse 70% 50% at 15% 0%,
+            rgba(157, 255, 107, 0.08),
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 60% 40% at 90% 10%,
+            rgba(120, 90, 255, 0.08),
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 80% 40% at 50% 110%,
+            rgba(0, 200, 255, 0.05),
+            transparent 60%
+          );
+        z-index: -1;
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: -1;
+        background-image: radial-gradient(
+          circle at 1px 1px,
+          rgba(255, 255, 255, 0.025) 1px,
+          transparent 0
+        );
+        background-size: 32px 32px;
+        mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button {
+        font-family: inherit;
+      }
+
+      /* ──────────────── Layout ──────────────── */
+      .shell {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 32px 32px 160px;
+      }
+
+      /* ──────────────── Top bar ──────────────── */
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 0 36px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 600;
+        font-size: 22px;
+        letter-spacing: -0.018em;
+      }
+
+      .brand-mark {
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #1a1a1e, #0a0a0b);
+        border: 1px solid var(--border-strong);
+        display: grid;
+        place-items: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .brand-mark::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 30% 20%, var(--accent-glow), transparent 60%);
+      }
+      .brand-mark span {
+        position: relative;
+        color: var(--accent);
+        font-family: var(--mono);
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .brand-x {
+        color: var(--text-dim);
+        font-weight: 400;
+        padding: 0 2px;
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .pill-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 11px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--border);
+        background: var(--bg-raised);
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-muted);
+        transition: all 0.15s ease;
+      }
+      .pill-link:hover {
+        color: var(--text);
+        border-color: var(--border-strong);
+      }
+      .pill-link .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 8px var(--accent);
+      }
+
+      /* ──────────────── Hero ──────────────── */
+      .hero {
+        padding: 14px 0 20px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 32px;
+        flex-wrap: wrap;
+      }
+      .hero-text { max-width: 540px; }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        padding: 4px 9px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--border);
+        background: var(--bg-raised);
+        margin-bottom: 12px;
+      }
+      .eyebrow::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+
+      h1 {
+        font-size: clamp(26px, 3.2vw, 36px);
+        line-height: 1.08;
+        letter-spacing: -0.025em;
+        margin: 0 0 8px;
+        font-weight: 600;
+      }
+      h1 .accent {
+        color: var(--accent);
+        font-style: italic;
+        font-weight: 500;
+      }
+
+      .tagline {
+        font-size: 14px;
+        line-height: 1.45;
+        color: var(--text-muted);
+        margin: 0;
+      }
+
+      /* ──────────────── Meeting URL field ──────────────── */
+      .meet-input {
+        margin-top: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px 8px 16px;
+        min-width: 360px;
+        flex: 1 1 360px;
+        background: var(--bg-card);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        max-width: 640px;
+        box-shadow: var(--shadow-card);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .meet-input:focus-within {
+        border-color: rgba(157, 255, 107, 0.45);
+        box-shadow: 0 0 0 4px var(--accent-glow);
+      }
+      .meet-input label {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding-right: 10px;
+        border-right: 1px solid var(--border);
+      }
+      .meet-input input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 14px;
+        padding: 4px 0;
+      }
+      .meet-input input::placeholder {
+        color: var(--text-dim);
+      }
+
+      /* ──────────────── Team preset bar ──────────────── */
+      .teams-bar {
+        padding: 40px 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .teams-bar .teams-eyebrow {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+      }
+      .teams-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+      }
+      .teams-row::-webkit-scrollbar {
+        display: none;
+      }
+      .team-pill {
+        appearance: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 13px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--border);
+        background: var(--bg-raised);
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 13px;
+        letter-spacing: -0.005em;
+        white-space: nowrap;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+      }
+      .team-pill:hover {
+        color: var(--text);
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .team-pill .team-count {
+        font-size: 11.5px;
+        color: var(--text-dim);
+      }
+      .team-pill:hover .team-count {
+        color: var(--text-muted);
+      }
+      .team-pill.active {
+        color: var(--text);
+        border-color: var(--accent);
+        background: linear-gradient(
+          180deg,
+          rgba(157, 255, 107, 0.08),
+          rgba(157, 255, 107, 0.02)
+        );
+        box-shadow: 0 0 0 1px var(--accent) inset, 0 0 0 4px var(--accent-glow);
+      }
+      .team-pill.active .team-count {
+        color: var(--accent);
+      }
+      .team-pill.team-clear {
+        color: var(--text-dim);
+        background: transparent;
+        border-style: dashed;
+      }
+      .team-pill.team-clear:hover {
+        color: var(--text);
+        border-style: solid;
+        border-color: rgba(248, 113, 113, 0.4);
+        background: rgba(248, 113, 113, 0.06);
+      }
+
+      /* ──────────────── Section heading ──────────────── */
+      .section-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        padding: 56px 0 20px;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      .section-head h2 {
+        font-size: 22px;
+        font-weight: 600;
+        margin: 0 0 4px;
+        letter-spacing: -0.015em;
+      }
+      .section-head p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 14px;
+      }
+
+      .section-head-tools {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .section-head .filters {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      /* ──────────────── Search box ──────────────── */
+      .search-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        width: 280px;
+        max-width: 100%;
+        background: var(--bg-card);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-card);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .search-box:focus-within {
+        border-color: rgba(157, 255, 107, 0.45);
+        box-shadow: 0 0 0 4px var(--accent-glow);
+      }
+      .search-box svg {
+        flex-shrink: 0;
+        color: var(--text-dim);
+      }
+      .search-box:focus-within svg {
+        color: var(--text-muted);
+      }
+      .search-box input {
+        flex: 1;
+        min-width: 0;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 4px 0;
+      }
+      .search-box input::placeholder {
+        color: var(--text-dim);
+      }
+      .search-clear {
+        appearance: none;
+        background: transparent;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        padding: 0;
+        width: 16px;
+        height: 16px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .search-box.has-value .search-clear {
+        display: inline-flex;
+      }
+      .search-clear:hover {
+        color: var(--text);
+      }
+
+      /* Team pill dimmed state (when search filters out all team members) */
+      .team-pill.dimmed {
+        opacity: 0.4;
+        pointer-events: none;
+        cursor: default;
+      }
+
+      /* ──────────────── Brief textarea ──────────────── */
+      /* Brief disclosure: collapsed pill that expands the textarea on click. */
+      .brief-disclosure {
+        margin-top: 12px;
+        flex: 1 1 100%;
+        max-width: 100%;
+      }
+      .brief-disclosure > summary {
+        list-style: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 12px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--border);
+        background: var(--bg-raised);
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-muted);
+        transition: all 0.15s ease;
+        user-select: none;
+      }
+      .brief-disclosure > summary::-webkit-details-marker { display: none; }
+      .brief-disclosure > summary:hover {
+        border-color: var(--border-strong);
+        color: var(--text);
+      }
+      .brief-disclosure[open] > summary {
+        border-color: rgba(157, 255, 107, 0.4);
+        color: var(--text);
+      }
+      .brief-summary-label { font-weight: 600; letter-spacing: 0.02em; }
+      .brief-summary-hint  { color: var(--text-dim); font-size: 11px; }
+
+      .brief-input {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 14px 12px;
+        flex: 1 1 100%;
+        max-width: 100%;
+        background: var(--bg-card);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-card);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .brief-input:focus-within {
+        border-color: rgba(157, 255, 107, 0.45);
+        box-shadow: 0 0 0 4px var(--accent-glow);
+      }
+      .brief-input .brief-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .brief-input label {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .brief-input .brief-count {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--text-dim);
+      }
+      .brief-input .brief-count.warn {
+        color: var(--amber);
+      }
+      .brief-input textarea {
+        width: 100%;
+        min-height: 48px;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13.5px;
+        line-height: 1.45;
+        padding: 2px 0 0;
+        resize: vertical;
+      }
+      .brief-input textarea::placeholder {
+        color: var(--text-dim);
+      }
+
+      /* ──────────────── Empty state ──────────────── */
+      .grid-empty {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 56px 24px;
+        text-align: center;
+        color: var(--text-muted);
+      }
+      .grid-empty svg {
+        color: var(--text-dim);
+        opacity: 0.7;
+      }
+      .grid-empty .grid-empty-title {
+        font-size: 14px;
+        color: var(--text-muted);
+      }
+      .grid-empty .grid-empty-hint {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-dim);
+      }
+      .chip {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        padding: 6px 11px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--border);
+        background: var(--bg-raised);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        user-select: none;
+      }
+      .chip:hover {
+        color: var(--text);
+        border-color: var(--border-strong);
+      }
+      .chip.active {
+        color: var(--accent-ink);
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      /* ──────────────── Specialist grid ──────────────── */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        position: relative;
+        padding: 18px 18px 16px;
+        background: var(--bg-card);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease,
+          box-shadow 0.18s ease, background 0.18s ease;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 168px;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--card-accent, var(--accent)),
+          transparent
+        );
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-2px);
+        border-color: var(--border-strong);
+        box-shadow: var(--shadow-lift);
+      }
+      .card:hover::before {
+        opacity: 0.6;
+      }
+
+      .card.selected {
+        border-color: var(--accent);
+        background: linear-gradient(
+          180deg,
+          rgba(157, 255, 107, 0.06),
+          rgba(157, 255, 107, 0.02)
+        );
+        box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow-lift);
+      }
+      .card.selected::before {
+        opacity: 1;
+        background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      }
+
+      .card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--card-accent, var(--accent)) 14%, transparent);
+        border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 40%, transparent);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35),
+                    0 0 0 3px color-mix(in srgb, var(--card-accent, var(--accent)) 8%, transparent);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .icon img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        border-radius: 50%;
+      }
+      .card:hover .icon {
+        transform: scale(1.04);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45),
+                    0 0 0 3px color-mix(in srgb, var(--card-accent, var(--accent)) 16%, transparent);
+      }
+
+      .check {
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        border: 1.5px solid var(--border-strong);
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        transition: all 0.15s ease;
+        background: rgba(0, 0, 0, 0.3);
+      }
+      .card:hover .check {
+        border-color: var(--text-muted);
+      }
+      .card.selected .check {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .check svg {
+        width: 12px;
+        height: 12px;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        stroke: var(--accent-ink);
+      }
+      .card.selected .check svg {
+        opacity: 1;
+      }
+
+      .card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+      }
+      .card-name {
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--text);
+      }
+      .card-role {
+        font-size: 12.5px;
+        color: var(--text-muted);
+      }
+      .card-desc {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.45;
+        margin-top: 8px;
+      }
+
+      .card-foot {
+        margin-top: auto;
+        padding-top: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .slash-id {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-dim);
+        letter-spacing: -0.01em;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 9px 3px 8px;
+        border-radius: var(--radius-pill);
+        font-family: var(--mono);
+        font-size: 10.5px;
+        text-transform: lowercase;
+        letter-spacing: 0.02em;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.3);
+        color: var(--text-muted);
+      }
+      .status .led {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--grey);
+      }
+      .status.idle .led {
+        background: var(--grey);
+      }
+      .status.thinking {
+        color: var(--amber);
+        border-color: rgba(251, 191, 36, 0.25);
+        background: rgba(251, 191, 36, 0.07);
+      }
+      .status.thinking .led {
+        background: var(--amber);
+        animation: pulse-amber 1.2s ease-in-out infinite;
+      }
+      .status.oncall {
+        color: var(--green);
+        border-color: rgba(74, 222, 128, 0.3);
+        background: rgba(74, 222, 128, 0.08);
+      }
+      .status.oncall .led {
+        background: var(--green);
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6);
+        animation: pulse-green 1.6s ease-out infinite;
+      }
+
+      @keyframes pulse-green {
+        0% {
+          box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6);
+        }
+        70% {
+          box-shadow: 0 0 0 7px rgba(74, 222, 128, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+        }
+      }
+      @keyframes pulse-amber {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      /* ──────────────── Sticky footer action bar ──────────────── */
+      .dock {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 10px 10px 20px;
+        background: rgba(14, 14, 16, 0.78);
+        backdrop-filter: blur(18px) saturate(1.3);
+        -webkit-backdrop-filter: blur(18px) saturate(1.3);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-pill);
+        box-shadow: 0 18px 48px -12px rgba(0, 0, 0, 0.7),
+          0 1px 0 rgba(255, 255, 255, 0.05) inset;
+        transition: transform 0.25s ease, opacity 0.25s ease;
+      }
+      .dock.hidden {
+        transform: translateX(-50%) translateY(24px);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .dock .count {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+      }
+      .dock .count .n {
+        display: inline-grid;
+        place-items: center;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+        font-size: 12px;
+      }
+      .dock .count .lbl {
+        color: var(--text-muted);
+      }
+
+      .btn {
+        appearance: none;
+        border: none;
+        cursor: pointer;
+        font-size: 13.5px;
+        font-weight: 500;
+        padding: 10px 16px;
+        border-radius: var(--radius-pill);
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        letter-spacing: -0.005em;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn-primary:hover:not(:disabled) {
+        filter: brightness(1.08);
+        box-shadow: 0 0 0 4px var(--accent-glow);
+      }
+      .btn-ghost {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .btn-ghost:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--border-strong);
+      }
+      .btn-clear {
+        background: transparent;
+        color: var(--text-muted);
+        padding: 10px 12px;
+      }
+      .btn-clear:hover {
+        color: var(--text);
+      }
+
+      /* ──────────────── Toast ──────────────── */
+      .toast {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 60;
+        padding: 14px 16px;
+        background: rgba(14, 14, 16, 0.92);
+        backdrop-filter: blur(14px);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        font-size: 13px;
+        color: var(--text);
+        box-shadow: 0 18px 48px -12px rgba(0, 0, 0, 0.8);
+        max-width: 360px;
+        transform: translateX(calc(100% + 40px));
+        transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .toast.show {
+        transform: translateX(0);
+      }
+      .toast.error {
+        border-color: rgba(248, 113, 113, 0.4);
+      }
+      .toast .title {
+        font-weight: 600;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .toast .title .led {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--green);
+      }
+      .toast.error .title .led {
+        background: #f87171;
+      }
+      .toast .body {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-muted);
+        line-height: 1.5;
+        word-break: break-all;
+      }
+
+      /* ──────────────── Footer note ──────────────── */
+      .fineprint {
+        margin: 56px 0 0;
+        font-size: 12.5px;
+        color: var(--text-dim);
+        font-family: var(--mono);
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      .fineprint a {
+        color: var(--text-muted);
+        transition: color 0.15s;
+      }
+      .fineprint a:hover {
+        color: var(--text);
+      }
+      .recall-link {
+        appearance: none;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 5px 11px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        margin-left: auto;
+      }
+      .recall-link:hover {
+        color: var(--text);
+        border-color: rgba(248, 113, 113, 0.4);
+        background: rgba(248, 113, 113, 0.07);
+      }
+      .recall-link:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* ──────────────── Per-card recall button ──────────────── */
+      .card-recall {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border-radius: 50%;
+        border: 1px solid var(--border-strong);
+        background: rgba(0, 0, 0, 0.45);
+        color: var(--text-muted);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        opacity: 0.6;
+        transition: opacity 0.15s ease, color 0.15s ease,
+          border-color 0.15s ease, background 0.15s ease;
+        z-index: 2;
+      }
+      .card-recall:hover {
+        opacity: 1;
+        color: #fecaca;
+        border-color: rgba(248, 113, 113, 0.55);
+        background: rgba(248, 113, 113, 0.14);
+      }
+      .card-recall:focus-visible {
+        opacity: 1;
+        outline: none;
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+      .card-recall:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .card-recall svg {
+        width: 13px;
+        height: 13px;
+      }
+      /* Hide the selection checkmark while the card is dispatched — the
+         recall button takes its slot in the top-right. */
+      .card.dispatched .check {
+        display: none;
+      }
+
+      /* ──────────────── Session history panel ──────────────── */
+      .history {
+        margin-top: 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .history-toggle {
+        appearance: none;
+        cursor: pointer;
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 13px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--border);
+        background: var(--bg-raised);
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: -0.005em;
+        transition: all 0.15s ease;
+      }
+      .history-toggle:hover {
+        color: var(--text);
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .history-toggle .chev {
+        width: 10px;
+        height: 10px;
+        transition: transform 0.2s ease;
+      }
+      .history.open .history-toggle .chev {
+        transform: rotate(90deg);
+      }
+      .history-toggle .count-badge {
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+      .history-panel {
+        display: none;
+        flex-direction: column;
+        padding: 4px 0 2px;
+      }
+      .history.open .history-panel {
+        display: flex;
+      }
+      .history-empty {
+        padding: 18px 4px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-dim);
+      }
+      .history-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .history-item {
+        display: grid;
+        grid-template-columns: 20px 86px 1fr auto;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 2px;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+      }
+      .history-item:last-child {
+        border-bottom: none;
+      }
+      .history-icon {
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+      }
+      .history-icon.dispatch { color: var(--green); }
+      .history-icon.recall   { color: var(--text-dim); }
+      .history-icon.error    { color: #f87171; }
+      .history-time {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-dim);
+      }
+      .history-main {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .history-who {
+        color: var(--text);
+        font-size: 13px;
+        letter-spacing: -0.005em;
+      }
+      .history-who .who-id {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-dim);
+        margin-left: 6px;
+      }
+      .history-brief {
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.4;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .history-log {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        padding: 3px 8px;
+        border-radius: var(--radius-pill);
+        cursor: copy;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .history-log:hover {
+        color: var(--text-muted);
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .history-log.copied {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+
+      @media (max-width: 640px) {
+        .history-item {
+          grid-template-columns: 20px 1fr;
+          grid-template-areas:
+            "icon time"
+            "icon main"
+            "icon log";
+          row-gap: 4px;
+        }
+        .history-icon { grid-area: icon; align-self: start; }
+        .history-time { grid-area: time; }
+        .history-main { grid-area: main; }
+        .history-log  { grid-area: log; justify-self: start; }
+      }
+
+      @media (max-width: 640px) {
+        .shell {
+          padding: 20px 16px 140px;
+        }
+        .topbar-right .pill-link {
+          display: none;
+        }
+        .meet-input label {
+          display: none;
+        }
+        .dock {
+          left: 12px;
+          right: 12px;
+          transform: none;
+          border-radius: var(--radius-lg);
+          padding: 10px 12px;
+        }
+        .dock.hidden {
+          transform: translateY(24px);
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="shell">
+      <!-- Top bar -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark"><span>g</span></div>
+          <span>gstack</span>
+          <span class="brand-x">×</span>
+          <span>AgentCall</span>
+        </div>
+        <div class="topbar-right">
+          <a class="pill-link" href="https://github.com/garrytan/gstack" target="_blank" rel="noopener">
+            <span class="dot"></span> 18 specialists online
+          </a>
+        </div>
+      </header>
+
+      <!-- Hero -->
+      <section class="hero">
+        <div class="hero-text">
+          <h1>Bring your <span class="accent">gstack specialist</span> on the call.</h1>
+          <p class="tagline">Drop any gstack specialist into your meeting as a voice agent.</p>
+        </div>
+
+        <!-- Meeting URL input -->
+        <div class="meet-input" id="meetInputWrap">
+          <label for="meetUrl">meet</label>
+          <input
+            id="meetUrl"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://meet.google.com/abc-defg-hij"
+          />
+        </div>
+
+        <!-- Brief — collapsed by default to keep specialists above the fold -->
+        <details class="brief-disclosure" id="briefDisclosure">
+          <summary>
+            <span class="brief-summary-label">+ Add brief</span>
+            <span class="brief-summary-hint">agenda, goal, or doc link · optional</span>
+          </summary>
+          <div class="brief-input" id="briefInputWrap">
+            <div class="brief-head">
+              <label for="brief">Brief</label>
+              <span class="brief-count" id="briefCount">0 / 500</span>
+            </div>
+            <textarea
+              id="brief"
+              rows="2"
+              maxlength="500"
+              spellcheck="true"
+              placeholder="Paste agenda, goal, or doc link. Specialists will reference it in their intro."
+            ></textarea>
+          </div>
+        </details>
+      </section>
+
+      <!-- Team presets -->
+      <section class="teams-bar" aria-label="Team presets">
+        <div class="teams-eyebrow">Teams</div>
+        <div class="teams-row" id="teamsRow"></div>
+      </section>
+
+      <!-- Section: specialists -->
+      <div class="section-head">
+        <div>
+          <h2>Specialists</h2>
+          <p>Selected agents join your meeting and introduce themselves.</p>
+        </div>
+        <div class="section-head-tools">
+          <div class="filters" id="filters"></div>
+          <div class="search-box" id="searchBox">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m20 20-3.5-3.5"></path>
+            </svg>
+            <input
+              id="searchInput"
+              type="search"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Search role, name, description…"
+              aria-label="Search specialists"
+            />
+            <button type="button" class="search-clear" id="searchClear"
+              aria-label="Clear search">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid" id="grid" aria-live="polite"></div>
+
+      <!-- Session history -->
+      <section class="history" id="history" aria-label="Session history">
+        <button class="history-toggle" id="historyToggle" type="button"
+          aria-expanded="false" aria-controls="historyPanel">
+          <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            aria-hidden="true">
+            <path d="M6 4l4 4-4 4" />
+          </svg>
+          <span id="historyToggleLabel">Show session history (0 events)</span>
+        </button>
+        <div class="history-panel" id="historyPanel" role="region">
+          <div class="history-empty" id="historyEmpty">
+            No events yet. Dispatch or recall a specialist to start the log.
+          </div>
+          <ul class="history-list" id="historyList"></ul>
+        </div>
+      </section>
+
+      <div class="fineprint">
+        <span>/dispatch — POST {"meetUrl", "specialists"}</span>
+        <a href="https://agentcall.dev" target="_blank" rel="noopener">agentcall.dev</a>
+        <a href="https://github.com/garrytan/gstack" target="_blank" rel="noopener">garrytan/gstack</a>
+        <button class="recall-link" id="recallBtn" type="button">Recall all bots</button>
+      </div>
+    </div>
+
+    <!-- Sticky dock -->
+    <div class="dock hidden" id="dock">
+      <div class="count">
+        <span class="n" id="dockCount">0</span>
+        <span class="lbl" id="dockLabel">specialists selected</span>
+      </div>
+      <button class="btn btn-clear" id="clearBtn" type="button">Clear</button>
+      <button class="btn btn-primary" id="dispatchBtn" type="button">
+        Dispatch selected
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast" role="status" aria-live="polite">
+      <div class="title"><span class="led"></span><span id="toastTitle">Dispatched</span></div>
+      <div class="body" id="toastBody"></div>
+    </div>
+
+    <script src="specialists.js"></script>
+    <script>
+      (function () {
+        const SPECIALISTS = window.SPECIALISTS || [];
+        const TEAMS = window.TEAMS || [];
+        const SPECIALIST_IDS = new Set(SPECIALISTS.map((s) => s.id));
+        const selected = new Set();
+        const statuses = new Map(); // id → "idle" | "thinking" | "oncall"
+
+        const $grid = document.getElementById("grid");
+        const $dock = document.getElementById("dock");
+        const $dockCount = document.getElementById("dockCount");
+        const $dockLabel = document.getElementById("dockLabel");
+        const $dispatchBtn = document.getElementById("dispatchBtn");
+        const $clearBtn = document.getElementById("clearBtn");
+        const $recallBtn = document.getElementById("recallBtn");
+        const $meetUrl = document.getElementById("meetUrl");
+        const $filters = document.getElementById("filters");
+        const $teamsRow = document.getElementById("teamsRow");
+        const $toast = document.getElementById("toast");
+        const $toastTitle = document.getElementById("toastTitle");
+        const $toastBody = document.getElementById("toastBody");
+        const $searchBox = document.getElementById("searchBox");
+        const $searchInput = document.getElementById("searchInput");
+        const $searchClear = document.getElementById("searchClear");
+        const $brief = document.getElementById("brief");
+        const $briefCount = document.getElementById("briefCount");
+        const $history = document.getElementById("history");
+        const $historyToggle = document.getElementById("historyToggle");
+        const $historyToggleLabel = document.getElementById("historyToggleLabel");
+        const $historyPanel = document.getElementById("historyPanel");
+        const $historyList = document.getElementById("historyList");
+        const $historyEmpty = document.getElementById("historyEmpty");
+
+        let searchQuery = "";
+
+        // ── Session history state ─────────────────────────────────────────
+        // In-memory only, never persisted. Entries are never removed, but the
+        // rendered list is truncated to HISTORY_DISPLAY_MAX. Each entry:
+        //   { id, type: "dispatch"|"recall"|"error",
+        //     specId, specName, ts (ms), brief?, logPath?, pid?, error? }
+        const history = [];
+        const HISTORY_DISPLAY_MAX = 30;
+        let historySeq = 0;
+        let historyOpen = false;
+        let historyRelTicker = null;
+
+        // Init statuses
+        SPECIALISTS.forEach((s) => statuses.set(s.id, "idle"));
+
+        // Filters
+        const categories = ["All", ...new Set(SPECIALISTS.map((s) => s.category))];
+        let activeCat = "All";
+        categories.forEach((c) => {
+          const el = document.createElement("button");
+          el.type = "button";
+          el.className = "chip" + (c === activeCat ? " active" : "");
+          el.textContent = c;
+          el.addEventListener("click", () => {
+            activeCat = c;
+            [...$filters.children].forEach((n) =>
+              n.classList.toggle("active", n.textContent === c)
+            );
+            render();
+          });
+          $filters.appendChild(el);
+        });
+
+        function matchesSearch(s, q) {
+          if (!q) return true;
+          const hay = [s.name, s.role, s.desc].filter(Boolean).join(" ").toLowerCase();
+          return hay.includes(q);
+        }
+
+        function getVisibleList() {
+          const q = searchQuery;
+          return SPECIALISTS.filter(
+            (s) =>
+              (activeCat === "All" || s.category === activeCat) &&
+              matchesSearch(s, q)
+          );
+        }
+
+        function render() {
+          $grid.innerHTML = "";
+          const list = getVisibleList();
+          if (list.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "grid-empty";
+            empty.innerHTML = `
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-3.5-3.5"></path>
+              </svg>
+              <div class="grid-empty-title">No specialists match your search</div>
+              <div class="grid-empty-hint">Try a different term or clear the filter.</div>
+            `;
+            $grid.appendChild(empty);
+          } else {
+            list.forEach((s) => $grid.appendChild(buildCard(s)));
+          }
+          refreshTeamPills();
+          updateDock();
+        }
+
+        function buildCard(s) {
+          const card = document.createElement("div");
+          const status = statuses.get(s.id) || "idle";
+          const dispatched = status === "oncall" || status === "thinking";
+          card.className =
+            "card" +
+            (selected.has(s.id) ? " selected" : "") +
+            (dispatched ? " dispatched" : "");
+          card.style.setProperty("--card-accent", s.accent);
+          card.dataset.id = s.id;
+          card.tabIndex = 0;
+          card.setAttribute("role", "button");
+          card.setAttribute("aria-pressed", selected.has(s.id) ? "true" : "false");
+
+          const statusLabel =
+            status === "oncall" ? "on call" : status === "thinking" ? "joining" : "idle";
+          const statusClass =
+            status === "oncall" ? "oncall" : status === "thinking" ? "thinking" : "idle";
+
+          const recallBtnHtml = dispatched
+            ? `<button class="card-recall" type="button" data-recall
+                aria-label="Recall ${escapeHtml(s.name)}" title="Recall ${escapeHtml(s.name)}">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <path d="M4 4l8 8M12 4l-8 8" />
+                </svg>
+              </button>`
+            : "";
+
+          card.innerHTML = `
+            ${recallBtnHtml}
+            <div class="card-head">
+              <div class="icon"><img src="/avatars/${encodeURIComponent(s.id)}.svg" alt="${escapeHtml(s.name)} avatar" loading="lazy"></div>
+              <div class="check" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 8.5 L6.5 12 L13 4.5" />
+                </svg>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="card-name">${escapeHtml(s.name)}</div>
+              <div class="card-role">${escapeHtml(s.role)}</div>
+              <div class="card-desc">${escapeHtml(s.desc)}</div>
+            </div>
+            <div class="card-foot">
+              <span class="slash-id">/${escapeHtml(s.id)}</span>
+              <span class="status ${statusClass}" data-status>
+                <span class="led"></span>${statusLabel}
+              </span>
+            </div>
+          `;
+
+          card.addEventListener("click", (e) => {
+            // Clicks on the recall button must not toggle selection.
+            if (e.target.closest("[data-recall]")) return;
+            e.preventDefault();
+            toggle(s.id);
+          });
+          card.addEventListener("keydown", (e) => {
+            if (e.target.closest("[data-recall]")) return;
+            if (e.key === " " || e.key === "Enter") {
+              e.preventDefault();
+              toggle(s.id);
+            }
+          });
+
+          const recallBtn = card.querySelector("[data-recall]");
+          if (recallBtn) {
+            recallBtn.addEventListener("click", (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              recallOne(s.id, recallBtn);
+            });
+          }
+
+          return card;
+        }
+
+        function toggle(id) {
+          if (selected.has(id)) selected.delete(id);
+          else selected.add(id);
+          const el = $grid.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+          if (el) {
+            const on = selected.has(id);
+            el.classList.toggle("selected", on);
+            el.setAttribute("aria-pressed", on ? "true" : "false");
+          }
+          updateDock();
+        }
+
+        // Ensure a specialist id is selected (add-only, never deselects).
+        function selectOne(id) {
+          if (!SPECIALIST_IDS.has(id) || selected.has(id)) return;
+          selected.add(id);
+          const el = $grid.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+          if (el) {
+            el.classList.add("selected");
+            el.setAttribute("aria-pressed", "true");
+          }
+        }
+
+        // Team preset pills: additive — clicking adds all members to the current selection.
+        function applyTeam(team) {
+          (team.specialists || []).forEach((id) => selectOne(id));
+          updateDock();
+          refreshTeamPills();
+        }
+
+        function refreshTeamPills() {
+          if (!$teamsRow) return;
+          const visibleIds = new Set(getVisibleList().map((s) => s.id));
+          const searchActive = !!searchQuery;
+          [...$teamsRow.querySelectorAll("[data-team-id]")].forEach((el) => {
+            const team = TEAMS.find((t) => t.id === el.dataset.teamId);
+            if (!team) return;
+            const allIn =
+              team.specialists.length > 0 &&
+              team.specialists.every((id) => selected.has(id));
+            el.classList.toggle("active", allIn);
+            el.setAttribute("aria-pressed", allIn ? "true" : "false");
+
+            // Dim the pill when search is active and no members survive the filter.
+            const anyVisible =
+              !searchActive ||
+              team.specialists.some((id) => visibleIds.has(id));
+            el.classList.toggle("dimmed", searchActive && !anyVisible);
+            if (searchActive && !anyVisible) {
+              el.setAttribute("aria-disabled", "true");
+            } else {
+              el.removeAttribute("aria-disabled");
+            }
+          });
+        }
+
+        function renderTeams() {
+          if (!$teamsRow) return;
+          $teamsRow.innerHTML = "";
+          TEAMS.forEach((team) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "team-pill";
+            btn.dataset.teamId = team.id;
+            btn.setAttribute("aria-pressed", "false");
+            btn.innerHTML = `<span>${escapeHtml(team.name)}</span><span class="team-count">· ${team.specialists.length}</span>`;
+            btn.addEventListener("click", () => applyTeam(team));
+            $teamsRow.appendChild(btn);
+          });
+
+          const clearPill = document.createElement("button");
+          clearPill.type = "button";
+          clearPill.className = "team-pill team-clear";
+          clearPill.textContent = "Clear";
+          clearPill.addEventListener("click", () => {
+            if (selected.size === 0) return;
+            [...selected].forEach((id) => toggle(id));
+            refreshTeamPills();
+          });
+          $teamsRow.appendChild(clearPill);
+        }
+
+        function setStatus(id, next) {
+          statuses.set(id, next);
+          const card = $grid.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+          if (!card) return;
+          const el = card.querySelector("[data-status]");
+          if (el) {
+            el.classList.remove("idle", "thinking", "oncall");
+            if (next === "oncall") {
+              el.classList.add("oncall");
+              el.innerHTML = `<span class="led"></span>on call`;
+            } else if (next === "thinking") {
+              el.classList.add("thinking");
+              el.innerHTML = `<span class="led"></span>joining`;
+            } else {
+              el.classList.add("idle");
+              el.innerHTML = `<span class="led"></span>idle`;
+            }
+          }
+          // Keep the per-card recall button in sync with dispatch state.
+          const dispatched = next === "oncall" || next === "thinking";
+          card.classList.toggle("dispatched", dispatched);
+          let btn = card.querySelector("[data-recall]");
+          if (dispatched && !btn) {
+            const spec = SPECIALISTS.find((s) => s.id === id);
+            const name = spec ? spec.name : id;
+            btn = document.createElement("button");
+            btn.className = "card-recall";
+            btn.type = "button";
+            btn.setAttribute("data-recall", "");
+            btn.setAttribute("aria-label", `Recall ${name}`);
+            btn.setAttribute("title", `Recall ${name}`);
+            btn.innerHTML = `
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                aria-hidden="true">
+                <path d="M4 4l8 8M12 4l-8 8" />
+              </svg>`;
+            btn.addEventListener("click", (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              recallOne(id, btn);
+            });
+            card.insertBefore(btn, card.firstChild);
+          } else if (!dispatched && btn) {
+            btn.remove();
+          }
+        }
+
+        function updateDock() {
+          const n = selected.size;
+          $dockCount.textContent = String(n);
+          $dockLabel.textContent =
+            n === 1 ? "specialist selected" : "specialists selected";
+          $dock.classList.toggle("hidden", n === 0);
+          $dispatchBtn.disabled = n === 0;
+          refreshTeamPills();
+        }
+
+        function escapeHtml(str) {
+          return String(str).replace(/[&<>"']/g, (c) =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+          );
+        }
+
+        function showToast(title, body, isError) {
+          $toastTitle.textContent = title;
+          $toastBody.textContent = body;
+          $toast.classList.toggle("error", !!isError);
+          $toast.classList.add("show");
+          clearTimeout(showToast._t);
+          showToast._t = setTimeout(() => $toast.classList.remove("show"), 4800);
+        }
+
+        async function dispatch(ids) {
+          const meetUrl = $meetUrl.value.trim();
+          if (!meetUrl || !/^https?:\/\/(meet\.google\.com|.*zoom\.us|teams\.microsoft\.com|.*webex\.com)/i.test(meetUrl)) {
+            showToast("Meeting URL required", "Paste a real Google Meet / Zoom / Teams URL above.", true);
+            $meetUrl.focus();
+            return;
+          }
+
+          const brief = ($brief && $brief.value ? $brief.value : "").trim().slice(0, 500);
+
+          ids.forEach((id) => setStatus(id, "thinking"));
+          $dispatchBtn.disabled = true;
+
+          try {
+            const res = await fetch("/dispatch", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ meetUrl, specialists: ids, brief, mode: "avatar" }),
+            });
+            const data = await res.json().catch(() => ({}));
+            // 207 = partial success: some bots started, some failed.
+            if (!res.ok && res.status !== 207) {
+              throw new Error(data.error || `HTTP ${res.status}`);
+            }
+
+            const pidMap = data.pids || {};
+            const errors = data.errors || {};
+            const okIds = ids.filter((id) => id in pidMap);
+            const failIds = ids.filter((id) => id in errors);
+
+            // Server stamps each runner's log with int(time.time()) at spawn.
+            // We approximate that using dispatch-response time — good enough
+            // for display; the path is copyable so the user can tab-complete.
+            const logTs = Math.floor(Date.now() / 1000);
+            okIds.forEach((id, i) => {
+              setTimeout(() => setStatus(id, "oncall"), 500 + i * 180);
+              const spec = SPECIALISTS.find((s) => s.id === id);
+              addHistoryEntry({
+                type: "dispatch",
+                specId: id,
+                specName: spec ? spec.name : id,
+                brief: brief,
+                pid: pidMap[id],
+                logPath: `/tmp/gstack-specialists/${id}.${logTs}.log`,
+              });
+            });
+            failIds.forEach((id) => {
+              setStatus(id, "idle");
+              const spec = SPECIALISTS.find((s) => s.id === id);
+              addHistoryEntry({
+                type: "error",
+                specId: id,
+                specName: spec ? spec.name : id,
+                error: errors[id],
+              });
+            });
+
+            if (okIds.length && !failIds.length) {
+              showToast(
+                `Dispatched ${okIds.length} specialist${okIds.length > 1 ? "s" : ""}.`,
+                okIds.map((id) => `${id}:${pidMap[id]}`).join("  "),
+                false
+              );
+            } else if (okIds.length && failIds.length) {
+              const firstErr = errors[failIds[0]] || "unknown";
+              showToast(
+                `${okIds.length} dispatched, ${failIds.length} failed`,
+                `${failIds.join(", ")} — ${firstErr}`.slice(0, 240),
+                true
+              );
+            } else {
+              const firstErr = errors[failIds[0]] || data.error || `HTTP ${res.status}`;
+              throw new Error(firstErr);
+            }
+          } catch (err) {
+            ids.forEach((id) => setStatus(id, "idle"));
+            showToast("Dispatch failed", String(err.message || err), true);
+          } finally {
+            $dispatchBtn.disabled = selected.size === 0;
+          }
+        }
+
+        async function recallOne(id, btn) {
+          const spec = SPECIALISTS.find((s) => s.id === id);
+          const name = spec ? spec.name : id;
+          if (btn) btn.disabled = true;
+          try {
+            const res = await fetch("/recall", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ specialists: [id] }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            setStatus(id, "idle");
+            addHistoryEntry({
+              type: "recall",
+              specId: id,
+              specName: name,
+            });
+            showToast(`Recalled ${name}`, `/${id}`, false);
+          } catch (err) {
+            addHistoryEntry({
+              type: "error",
+              specId: id,
+              specName: name,
+              error: String(err.message || err),
+            });
+            showToast("Recall failed", String(err.message || err), true);
+            if (btn) btn.disabled = false;
+          }
+        }
+
+        async function recallAll() {
+          $recallBtn.disabled = true;
+          try {
+            const res = await fetch("/recall", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ all: true }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+            const stopped = data.stopped || [];
+            stopped.forEach((s) => {
+              if (!s || !s.id) return;
+              setStatus(s.id, "idle");
+              addHistoryEntry({
+                type: "recall",
+                specId: s.id,
+                specName: s.name || s.id,
+              });
+            });
+            if (stopped.length === 0) {
+              showToast("Nothing to recall", "No active specialists.", false);
+            } else {
+              showToast(
+                `Recalled ${stopped.length} specialist${stopped.length > 1 ? "s" : ""}.`,
+                stopped.map((s) => `${s.id}:${s.pid}`).join("  "),
+                false
+              );
+            }
+          } catch (err) {
+            showToast("Recall failed", String(err.message || err), true);
+          } finally {
+            $recallBtn.disabled = false;
+          }
+        }
+
+        $dispatchBtn.addEventListener("click", () => {
+          if (selected.size === 0) return;
+          dispatch([...selected]);
+        });
+        $clearBtn.addEventListener("click", () => {
+          [...selected].forEach((id) => toggle(id));
+        });
+        $recallBtn.addEventListener("click", () => {
+          recallAll();
+        });
+
+        // Keyboard: Cmd/Ctrl+Enter to dispatch
+        document.addEventListener("keydown", (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            if (selected.size > 0) {
+              e.preventDefault();
+              dispatch([...selected]);
+            }
+          }
+        });
+
+        // ── Search wiring ─────────────────────────────────────────────────
+        if ($searchInput) {
+          $searchInput.addEventListener("input", () => {
+            searchQuery = $searchInput.value.trim().toLowerCase();
+            $searchBox.classList.toggle("has-value", $searchInput.value.length > 0);
+            render();
+          });
+          $searchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && $searchInput.value) {
+              e.preventDefault();
+              $searchInput.value = "";
+              searchQuery = "";
+              $searchBox.classList.remove("has-value");
+              render();
+            }
+          });
+        }
+        if ($searchClear) {
+          $searchClear.addEventListener("click", () => {
+            $searchInput.value = "";
+            searchQuery = "";
+            $searchBox.classList.remove("has-value");
+            $searchInput.focus();
+            render();
+          });
+        }
+
+        // ── Brief wiring ──────────────────────────────────────────────────
+        if ($brief && $briefCount) {
+          const updateBriefCount = () => {
+            const n = $brief.value.length;
+            $briefCount.textContent = `${n} / 500`;
+            $briefCount.classList.toggle("warn", n >= 450);
+          };
+          $brief.addEventListener("input", updateBriefCount);
+          updateBriefCount();
+        }
+
+
+        // ── Session history helpers ───────────────────────────────────────
+        function addHistoryEntry(entry) {
+          history.unshift({
+            ...entry,
+            id: ++historySeq,
+            ts: Date.now(),
+          });
+          renderHistory();
+        }
+
+        function formatRelative(ts) {
+          const secs = Math.max(0, Math.round((Date.now() - ts) / 1000));
+          if (secs < 10) return "just now";
+          if (secs < 60) return `${secs}s ago`;
+          const mins = Math.floor(secs / 60);
+          if (mins < 60) return `${mins}m ago`;
+          const hours = Math.floor(mins / 60);
+          if (hours < 24) return `${hours}h ago`;
+          const days = Math.floor(hours / 24);
+          return `${days}d ago`;
+        }
+
+        const HISTORY_ICONS = {
+          dispatch: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 8h10M9 4l4 4-4 4" />
+          </svg>`,
+          recall: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <path d="M13 8H3M7 4l-4 4 4 4" />
+          </svg>`,
+          error: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="6" />
+            <path d="M8 5v3.5M8 11v.01" />
+          </svg>`,
+        };
+
+        function renderHistory() {
+          const n = history.length;
+          const label = historyOpen ? "Hide" : "Show";
+          $historyToggleLabel.textContent =
+            `${label} session history (${n} event${n === 1 ? "" : "s"})`;
+
+          if (!historyOpen) {
+            // Still start the ticker when hidden so the count label is fresh
+            // when re-opened — but the list DOM only matters when visible.
+            return;
+          }
+
+          if (n === 0) {
+            $historyEmpty.style.display = "";
+            $historyList.innerHTML = "";
+            return;
+          }
+          $historyEmpty.style.display = "none";
+
+          const visible = history.slice(0, HISTORY_DISPLAY_MAX);
+          $historyList.innerHTML = visible
+            .map((e) => {
+              const briefText =
+                e.brief && e.brief.length > 0
+                  ? `<div class="history-brief" title="${escapeHtml(e.brief)}">${escapeHtml(e.brief.slice(0, 60))}${e.brief.length > 60 ? "…" : ""}</div>`
+                  : "";
+              const logChip =
+                e.logPath
+                  ? `<a class="history-log" href="file://${encodeURI(e.logPath)}"
+                        data-log-path="${escapeHtml(e.logPath)}"
+                        title="Click to copy · ${escapeHtml(e.logPath)}">
+                        ${escapeHtml(e.logPath)}
+                      </a>`
+                  : e.type === "error" && e.error
+                    ? `<span class="history-log" title="${escapeHtml(e.error)}">${escapeHtml(String(e.error).slice(0, 60))}${String(e.error).length > 60 ? "…" : ""}</span>`
+                    : "";
+              return `
+                <li class="history-item" data-entry-id="${e.id}">
+                  <span class="history-icon ${e.type}">${HISTORY_ICONS[e.type] || ""}</span>
+                  <span class="history-time" data-ts="${e.ts}">${formatRelative(e.ts)}</span>
+                  <div class="history-main">
+                    <div class="history-who">${escapeHtml(e.specName)}<span class="who-id">/${escapeHtml(e.specId)}</span></div>
+                    ${briefText}
+                  </div>
+                  ${logChip}
+                </li>
+              `;
+            })
+            .join("");
+        }
+
+        function tickRelativeTimes() {
+          if (!historyOpen) return;
+          $historyList.querySelectorAll(".history-time[data-ts]").forEach((el) => {
+            const ts = Number(el.dataset.ts);
+            if (!Number.isFinite(ts)) return;
+            el.textContent = formatRelative(ts);
+          });
+        }
+
+        if ($historyToggle) {
+          $historyToggle.addEventListener("click", () => {
+            historyOpen = !historyOpen;
+            $history.classList.toggle("open", historyOpen);
+            $historyToggle.setAttribute("aria-expanded", historyOpen ? "true" : "false");
+            renderHistory();
+            if (historyOpen && !historyRelTicker) {
+              historyRelTicker = setInterval(tickRelativeTimes, 15000);
+            } else if (!historyOpen && historyRelTicker) {
+              clearInterval(historyRelTicker);
+              historyRelTicker = null;
+            }
+          });
+        }
+
+        if ($historyList) {
+          // Click-to-copy on log-path chips (file:// usually won't load, but
+          // copying gives the user a path they can paste into a terminal).
+          $historyList.addEventListener("click", (e) => {
+            const chip = e.target.closest(".history-log[data-log-path]");
+            if (!chip) return;
+            e.preventDefault();
+            const path = chip.dataset.logPath;
+            const done = () => {
+              chip.classList.add("copied");
+              setTimeout(() => chip.classList.remove("copied"), 900);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(path).then(done, done);
+            } else {
+              // Fallback: select + execCommand for older browsers.
+              const ta = document.createElement("textarea");
+              ta.value = path;
+              document.body.appendChild(ta);
+              ta.select();
+              try { document.execCommand("copy"); } catch (_) {}
+              document.body.removeChild(ta);
+              done();
+            }
+          });
+        }
+
+        renderHistory();
+        renderTeams();
+        render();
+      })();
+    </script>
+  </body>
+</html>

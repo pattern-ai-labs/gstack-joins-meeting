@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>gstack specialists — avatar preview</title>
+<style>
+  body { margin: 0; padding: 40px; background: #0a0a0b; color: #f5f5f7;
+         font-family: "Inter", system-ui, sans-serif; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
+  h1 span { color: #9dff6b; font-style: italic; font-weight: 500; }
+  p { color: #8b8b94; margin: 0 0 32px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 24px; max-width: 1280px; margin: 0 auto; }
+  .card { background: rgba(22,22,26,0.72); border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 14px; padding: 22px 16px 18px; text-align: center;
+          transition: transform 0.15s ease, border-color 0.15s ease; }
+  .card:hover { border-color: rgba(255,255,255,0.20); transform: translateY(-2px); }
+  .card img { width: 144px; height: 144px; border-radius: 50%; margin-bottom: 14px;
+              box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+  .n { font-size: 14px; font-weight: 600; }
+  .r { font-size: 11px; color: #8b8b94; margin-top: 4px;
+       font-family: "JetBrains Mono", ui-monospace, monospace; }
+  a { color: inherit; text-decoration: none; display: block; }
+</style>
+</head>
+<body>
+<h1>gstack specialists <span>— avatar preview</span></h1>
+<p>18 characters, one per specialist. Click any card to see the live avatar page (what the meeting renders as camera feed).</p>
+<div class="grid" id="grid"></div>
+
+<script>
+const SPECIALISTS = [
+  ["office-hours",        "YC Office Hours"],
+  ["plan-ceo-review",     "CEO"],
+  ["plan-eng-review",     "Eng Manager"],
+  ["plan-design-review",  "Senior Designer"],
+  ["plan-devex-review",   "DX Lead"],
+  ["design-consultation", "Design Partner"],
+  ["design-shotgun",      "Design Explorer"],
+  ["design-html",         "Design Engineer"],
+  ["review",              "Staff Engineer"],
+  ["investigate",         "Debugger"],
+  ["design-review",       "Designer Who Codes"],
+  ["devex-review",        "DX Tester"],
+  ["qa",                  "QA Lead"],
+  ["cso",                 "CSO"],
+  ["ship",                "Release Engineer"],
+  ["land-and-deploy",     "Deploy Engineer"],
+  ["canary",              "SRE"],
+  ["retro",               "Retro Facilitator"],
+];
+
+const grid = document.getElementById("grid");
+SPECIALISTS.forEach(([id, name]) => {
+  const a = document.createElement("a");
+  a.href = "/index.html?name=" + encodeURIComponent(name);
+  a.innerHTML = `<div class="card">
+    <img src="/avatars/${id}.svg" alt="${name}">
+    <div class="n">${name}</div>
+    <div class="r">${id}</div>
+  </div>`;
+  grid.appendChild(a);
+});
+</script>
+</body>
+</html>
