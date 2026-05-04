@@ -1,4 +1,31 @@
+# Per-session bot artifacts (cmds, jsonl event streams, orchestrator logs)
 sessions/
+
+# Python bytecode
 __pycache__/
 *.pyc
+*.pyo
+
+# OS / editor noise
 .DS_Store
+*.swp
+*.swo
+
+# Claude Code per-user settings (do NOT check this in — contains
+# permission allow-lists that are user/host specific)
+.claude/settings.local.json
+
+# Local secrets — defense in depth even though we never write any here
+.env
+.env.*
+*.key
+
+# Editor + tooling caches
+.idea/
+.vscode/
+.ruff_cache/
+.mypy_cache/
+
+# Local override / experimentation
+*.local
+*.local.*

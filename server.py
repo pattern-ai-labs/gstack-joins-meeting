@@ -32,6 +32,41 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Subprocess env hardening
+# ---------------------------------------------------------------------------
+# We pass only the env vars the bridge actually needs into spawned children.
+# Without this, every secret on the dev's shell (AWS keys, GitHub tokens,
+# unrelated API keys) gets handed to a vendored third-party bridge.
+_SAFE_ENV_KEYS = frozenset({
+    "PATH", "HOME", "USER", "LOGNAME", "SHELL", "PWD",
+    "LANG", "LC_ALL", "LC_CTYPE", "TERM", "TZ",
+    "PYTHONUNBUFFERED", "PYTHONPATH",
+    "AGENTCALL_API_KEY", "AGENTCALL_API_URL",
+})
+
+
+def _safe_env() -> dict:
+    return {k: v for k, v in os.environ.items() if k in _SAFE_ENV_KEYS}
+
+
+def _looks_like_runner(pid: int) -> bool:
+    """Verify a PID's argv looks like one of our specialist_runner children.
+
+    Defends against PID re-use: if the OS re-assigned the PID we recorded
+    in active.json, we don't want /recall to SIGTERM whatever now holds it.
+    Uses `ps` (POSIX, no extra deps) so this works on macOS and Linux.
+    """
+    try:
+        out = subprocess.run(
+            ["ps", "-p", str(int(pid)), "-o", "args="],
+            capture_output=True, text=True, timeout=2,
+        )
+        return "specialist_runner.py" in out.stdout
+    except Exception:
+        return False
 from urllib.parse import urlparse
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -62,8 +97,26 @@ def _find_bridge() -> Path:
 
 BRIDGE = _find_bridge()
 RUNNER = ROOT / "specialist_runner.py"
-LOG_DIR = Path("/tmp/gstack-specialists")
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+# Per-user, mode-0700 log dir so other local users can't tamper with
+# active.json (which /recall trusts for PIDs to SIGTERM).
+def _log_dir() -> Path:
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    p = Path(f"/tmp/gstack-specialists-{uid}")
+    p.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        os.chmod(p, 0o700)
+    except Exception:
+        pass
+    # Back-compat symlink (some older code paths reference the unscoped dir).
+    legacy = Path("/tmp/gstack-specialists")
+    try:
+        if not legacy.exists():
+            legacy.symlink_to(p)
+    except Exception:
+        pass
+    return p
+
+LOG_DIR = _log_dir()
 ACTIVE_FILE = LOG_DIR / "active.json"
 _active_lock = threading.Lock()
 
@@ -71,7 +124,35 @@ _active_lock = threading.Lock()
 # Must stay in sync with specialists.js (same ids, same human-readable names).
 # Each entry carries the display name, role (used in the greeting), and a
 # one-sentence description played after the role.
-SPECIALISTS: dict[str, dict[str, str]] = {
+def _load_specialists_data() -> dict[str, dict[str, str]]:
+    """Load the canonical specialist registry from data/specialists.json.
+
+    Single source of truth — keeps server.py, specialist_runner.py,
+    specialists.js, and avatar-page in sync. If the JSON file is missing
+    we fall back to the hardcoded dict below so dev installs still work.
+    """
+    json_path = ROOT / "data" / "specialists.json"
+    if json_path.is_file():
+        try:
+            data = json.loads(json_path.read_text())
+            return {
+                s["id"]: {
+                    "name":        s["name"],
+                    "role":        s["role"],
+                    "description": s["description"],
+                    "voice":       s.get("voice", "af_heart"),
+                }
+                for s in data
+            }
+        except Exception as e:
+            sys.stderr.write(f"[warn] could not parse data/specialists.json: {e}\n")
+    return _HARDCODED_SPECIALISTS  # back-compat
+
+
+# Hardcoded fallback (kept in sync with data/specialists.json by hand —
+# we read the JSON when it's present, this exists only for the "user
+# deleted the data dir" failure mode).
+_HARDCODED_SPECIALISTS: dict[str, dict[str, str]] = {
     "office-hours": {
         "name": "YC Office Hours",
         "role": "YC Office Hours partner",
@@ -182,10 +263,19 @@ SPECIALISTS: dict[str, dict[str, str]] = {
     },
 }
 
+
+# Resolve the actual registry now (JSON if present, else fallback above).
+SPECIALISTS: dict[str, dict[str, str]] = _load_specialists_data()
+
+
 STATIC_FILES = {
     "/":               ("index.html",    "text/html; charset=utf-8"),
     "/index.html":     ("index.html",    "text/html; charset=utf-8"),
     "/specialists.js": ("specialists.js", "application/javascript; charset=utf-8"),
+    # Expose the canonical JSON so the dashboard + avatar page can read
+    # straight from the source of truth. No JS build step required.
+    "/specialists.json": ("data/specialists.json", "application/json; charset=utf-8"),
+    "/teams.json":       ("data/teams.json",       "application/json; charset=utf-8"),
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -310,16 +400,37 @@ def spawn_specialist(
         stdout=log_fh,
         stderr=log_fh,
         cwd=str(ROOT),
-        env=os.environ.copy(),
+        env=_safe_env(),
         start_new_session=True,
     )
     return proc.pid, str(log_path)
 
 
+# Allow-list of host suffixes we'll let bots be dispatched against. Without
+# this, /dispatch would happily drive bots at any URL — combined with a CSRF
+# bypass (cross-origin tab POSTing to localhost), an attacker could burn the
+# user's AgentCall credits or join attacker-controlled meetings.
+_ALLOWED_MEET_HOSTS: tuple[str, ...] = (
+    "meet.google.com",
+    "zoom.us",       # *.zoom.us
+    "teams.microsoft.com",
+    "teams.live.com",
+    "webex.com",     # *.webex.com
+)
+
+
 def validate_meet_url(url: str) -> bool:
     try:
         p = urlparse(url)
-        return p.scheme in ("http", "https") and bool(p.netloc)
+        if p.scheme not in ("https", "http"):
+            return False
+        host = (p.hostname or "").lower()
+        if not host:
+            return False
+        for allowed in _ALLOWED_MEET_HOSTS:
+            if host == allowed or host.endswith("." + allowed):
+                return True
+        return False
     except Exception:
         return False
 
@@ -346,6 +457,13 @@ def recall(targets: list[str] | None, all_targets: bool) -> dict:
         match = all_targets or (spec_id in (targets or []))
         if not match:
             remaining.append(r)
+            continue
+        # Defense-in-depth: verify the PID still belongs to one of OUR
+        # runners before SIGTERMing it. PIDs roll over after reboot/wrap,
+        # and a /recall right after such a roll could otherwise kill an
+        # unrelated process.
+        if not _looks_like_runner(pid):
+            missing.append(f"{spec_id}:pid_no_longer_ours")
             continue
         try:
             os.kill(int(pid), signal.SIGTERM)
@@ -403,8 +521,35 @@ class Handler(BaseHTTPRequestHandler):
         body = fpath.read_bytes()
         self._send(200, body, ctype, cache=False)
 
+    # ── CSRF guard ─────────────────────────────────────────────────────────
+    def _csrf_ok(self) -> bool:
+        """Reject POSTs from cross-origin pages.
+
+        A phishing tab can submit a `<form enctype="text/plain">` shaped as
+        JSON to http://127.0.0.1:8765 and trigger /dispatch /recall on the
+        dev's machine. We refuse unless the request looks same-origin.
+        """
+        # Any browser POST that *can* be CSRF'd carries an Origin header.
+        # Accept only when it points back at our local dashboard (or is
+        # absent + not from a browser, which is curl/the runner itself).
+        origin = self.headers.get("Origin", "").rstrip("/").lower()
+        if origin:
+            ok_origins = {
+                f"http://127.0.0.1:{PORT}",
+                f"http://localhost:{PORT}",
+            }
+            return origin in ok_origins
+        # No Origin? Require Sec-Fetch-Site=same-origin OR no Sec-Fetch-Site
+        # (curl/python clients don't send it; cross-site browser fetches do).
+        sfs = self.headers.get("Sec-Fetch-Site", "").lower()
+        if sfs and sfs not in ("same-origin", "same-site", "none"):
+            return False
+        return True
+
     # ── POST dispatcher ────────────────────────────────────────────────────
     def do_POST(self):
+        if not self._csrf_ok():
+            return self._send_json(403, {"error": "cross-origin request blocked"})
         if self.path == "/dispatch":
             return self._handle_dispatch()
         if self.path == "/recall":
@@ -608,6 +753,49 @@ def _ensure_avatar_server() -> subprocess.Popen | None:
     return proc
 
 
+def _regen_specialists_js() -> None:
+    """Regenerate specialists.js from data/specialists.json + data/teams.json.
+
+    The dashboard's index.html reads `window.SPECIALISTS` + `window.TEAMS`
+    synchronously at load time. To keep one source of truth without making
+    the dashboard async, we regenerate the static JS bundle from JSON every
+    time the server starts. Edit the JSON; restart the server; UI updates.
+    """
+    json_path  = ROOT / "data" / "specialists.json"
+    teams_path = ROOT / "data" / "teams.json"
+    out_path   = ROOT / "specialists.js"
+    if not json_path.is_file():
+        return  # JSON missing → leave the existing JS alone
+    try:
+        specs = json.loads(json_path.read_text())
+        teams = json.loads(teams_path.read_text()) if teams_path.is_file() else []
+    except Exception as e:
+        sys.stderr.write(f"[warn] regen specialists.js skipped: {e}\n")
+        return
+
+    # Map JSON shape → dashboard JS shape (shorter field names, single
+    # description, accent + glyph for the card UI).
+    js_specs = []
+    for s in specs:
+        js_specs.append({
+            "id":       s.get("id"),
+            "name":     s.get("card_name", s.get("name")),
+            "role":     s.get("role"),
+            "desc":     s.get("desc_card", s.get("description")),
+            "icon":     s.get("icon", ""),
+            "glyph":    s.get("glyph", ""),
+            "accent":   s.get("accent", "#9dff6b"),
+            "category": s.get("category", "Misc"),
+        })
+    body = (
+        "// AUTO-GENERATED from data/specialists.json + data/teams.json.\n"
+        "// Edit the JSON; restart server.py to regenerate this file.\n"
+        f"window.SPECIALISTS = {json.dumps(js_specs, indent=2, ensure_ascii=False)};\n"
+        f"window.TEAMS = {json.dumps(teams, indent=2, ensure_ascii=False)};\n"
+    )
+    out_path.write_text(body, encoding="utf-8")
+
+
 def main():
     if not BRIDGE.exists():
         print(f"[warn] bridge.py not found at {BRIDGE}", file=sys.stderr)
@@ -615,6 +803,10 @@ def main():
               file=sys.stderr)
     if not RUNNER.exists():
         print(f"[warn] specialist_runner.py not found at {RUNNER}", file=sys.stderr)
+
+    # Regenerate the dashboard JS bundle from the canonical JSON so we
+    # have one source of truth (data/specialists.json + data/teams.json).
+    _regen_specialists_js()
 
     # Boot the avatar-page server on port 3000 so avatar-mode dispatch
     # always has a target to tunnel to. Skipped if already running.

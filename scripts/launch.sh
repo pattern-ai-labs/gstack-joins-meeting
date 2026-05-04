@@ -60,7 +60,9 @@ LOG="$SESSION/orchestrator.log"
 # Spawn. `tail -n 0 -f CMDS` pipes only new lines appended after this moment,
 # so previous noise doesn't re-fire.
 PYTHONUNBUFFERED=1 python3 "$BRIDGE" "$URL" \
-  --name "$BOT_NAME" --voice "$VOICE" --output "$OUT" \
+  --name "$BOT_NAME" --voice "$VOICE" \
+  --vad-timeout "${VAD_TIMEOUT:-0.8}" \
+  --output "$OUT" \
   < <(tail -n 0 -f "$CMDS") \
   >> "$LOG" 2>&1 &
 

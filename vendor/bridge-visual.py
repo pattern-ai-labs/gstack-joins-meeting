@@ -579,21 +579,31 @@ async def read_stdin(client: APIClient, done_event: asyncio.Event,
                         if done_event.is_set():
                             break
 
-                # Forward optional `destination` so callers can force audio
-                # to the meeting (instead of the auto-webpage route). With
-                # destination="meeting", audio is injected directly into the
-                # call even though the page is serving as video — visuals
-                # keep rendering, and audio bypasses the fragile webpage
-                # audio path.
-                payload = {
-                    "type": "tts.speak",
-                    "text": cmd.get("text", ""),
-                    "voice": cmd.get("voice", "af_heart"),
-                    "speed": cmd.get("speed", 1.0),
-                }
+                # When destination is set (typically "meeting" in avatar
+                # mode), use the explicit-routing `tts.generate` API. The
+                # auto-routing `tts.speak` honors the call's mode — for
+                # webpage-av calls that means audio is sent ONLY to the
+                # webpage and never injected into the meeting; the
+                # webpage's audio path through FirstCall's headless
+                # browser has been unreliable, so we bypass it. Avatar
+                # visuals keep rendering, audio is injected directly.
                 dest = cmd.get("destination")
                 if dest in ("meeting", "webpage", "agent"):
-                    payload["destination"] = dest
+                    payload = {
+                        "type": "tts.generate",
+                        "text": cmd.get("text", ""),
+                        "voice": cmd.get("voice", "af_heart"),
+                        "speed": cmd.get("speed", 1.0),
+                        "destination": dest,
+                    }
+                else:
+                    payload = {
+                        "type": "tts.speak",
+                        "text": cmd.get("text", ""),
+                        "voice": cmd.get("voice", "af_heart"),
+                        "speed": cmd.get("speed", 1.0),
+                    }
+                emit_err(f"[bridge] sending {payload['type']} dest={payload.get('destination')}")
                 await client.send(payload)
 
             elif command == "send_chat":

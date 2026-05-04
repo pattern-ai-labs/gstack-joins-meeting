@@ -149,9 +149,13 @@ const audioPlayer = new AgentCallAudio({
 const botName = params.get('name') || 'Claude';
 
 // Per-specialist avatar map: display name → specialist id.
-// Each specialist has a 3D character avatar at /avatars/<id>.svg
-// (DiceBear-generated, deterministic per id, background = accent color).
-const SPECIALIST_ID_BY_NAME = {
+// Specialist registry — fetched from the dashboard server's
+// /specialists.json (or the avatar server's /specialists.json if served
+// alongside). Falls back to a small hardcoded map so the avatar still
+// renders for the well-known bot names if the JSON fails to load. This
+// is the SAME source of truth that server.py and specialist_runner.py
+// read (data/specialists.json) — change it once, every consumer updates.
+const FALLBACK_ID_BY_NAME = {
   "YC Office Hours":    "office-hours",
   "CEO":                "plan-ceo-review",
   "Eng Manager":        "plan-eng-review",
@@ -170,7 +174,29 @@ const SPECIALIST_ID_BY_NAME = {
   "Deploy Engineer":    "land-and-deploy",
   "SRE":                "canary",
   "Retro Facilitator":  "retro",
+  "Claude":             "claude",
 };
+let SPECIALIST_ID_BY_NAME = { ...FALLBACK_ID_BY_NAME };
+
+// Try to refresh from canonical JSON. Best-effort, sync via XHR-style
+// fetch so we don't have to make page init async. Avatar updates if the
+// fetch lands in time; otherwise the fallback map is already correct
+// for the 18 known specialists shipped with the project.
+fetch("specialists.json", { cache: "no-store" })
+  .then(r => r.ok ? r.json() : null)
+  .then(data => {
+    if (!Array.isArray(data)) return;
+    const fresh = {};
+    for (const s of data) {
+      if (s && s.name && s.id) fresh[s.name] = s.id;
+    }
+    fresh["Claude"] = "claude"; // host bot, not in the registry
+    SPECIALIST_ID_BY_NAME = fresh;
+    // If our avatar img was set from the fallback, refresh it now.
+    const id = SPECIALIST_ID_BY_NAME[botName];
+    if (id) document.getElementById("avatar").src = `avatars/${id}.svg`;
+  })
+  .catch(() => {});
 
 function avatarFor(name) {
   const id = SPECIALIST_ID_BY_NAME[name];
@@ -206,22 +232,66 @@ function setVoiceState(state) {
 
 setVoiceState('listening');
 
+// Lightweight diagnostic — beacons every interesting event back to the
+// avatar server so we can read what FirstCall's headless browser actually
+// sees (we can't open its devtools). The `?dbg=...` requests show in the
+// avatar-server access log.
+function dbg(msg) {
+  try {
+    const url = "/dbg.gif?" + encodeURIComponent(msg).slice(0, 200);
+    new Image().src = url;
+  } catch (_) {}
+}
+
+// Proactively prime the AudioContext on page load + force-resume it.
+// FirstCall's headless Chrome has no user gesture, so AudioContext starts
+// suspended; suspended contexts swallow all queued buffers.
+(function primeAudio() {
+  try {
+    audioPlayer.ctx = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 24000,
+    });
+    dbg("audioctx-init:" + audioPlayer.ctx.state);
+    audioPlayer.ctx.resume().then(
+      () => dbg("audioctx-resume-ok:" + audioPlayer.ctx.state),
+      (e) => dbg("audioctx-resume-fail:" + (e && e.message || "?"))
+    );
+  } catch (e) {
+    dbg("audioctx-ctor-fail:" + (e && e.message || "?"));
+  }
+})();
+
 // Connect to AgentCall WebSocket.
 if (wsURL) {
-  ws = new WebSocket(wsURL);
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    const eventType = msg.event || msg.type;
+  dbg("ws-init:" + wsURL.slice(0, 80));
+  try { ws = new WebSocket(wsURL); }
+  catch (e) { dbg("ws-ctor-error:" + e.message); }
 
-    if (eventType === 'voice.state' && msg.state) {
-      // Ignore server's listening reset if audio is still playing
-      if (msg.state === 'listening' && audioPlayer.isPlaying()) return;
-      setVoiceState(msg.state);
-    }
+  if (ws) {
+    ws.onopen    = () => dbg("ws-open");
+    ws.onerror   = (e) => dbg("ws-error");
+    ws.onclose   = (e) => dbg("ws-close:" + e.code);
+    ws.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch (_) { dbg("bad-json"); return; }
+      const eventType = msg.event || msg.type;
+      // Beacon out the most important events.
+      if (eventType === "tts.webpage_audio") {
+        dbg("audio-chunk:" + (msg.data ? msg.data.length : 0));
+      } else if (eventType === "voice.state") {
+        dbg("voice:" + msg.state);
+      } else if (eventType === "tts.audio_clear") {
+        dbg("audio-clear");
+      }
 
-    // Audio playback + clear.
-    audioPlayer.handleEvent(msg);
-  };
+      if (eventType === 'voice.state' && msg.state) {
+        if (msg.state === 'listening' && audioPlayer.isPlaying()) return;
+        setVoiceState(msg.state);
+      }
+
+      audioPlayer.handleEvent(msg);
+    };
+  }
 }
 </script>
 </body>

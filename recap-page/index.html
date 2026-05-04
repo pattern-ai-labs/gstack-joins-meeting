@@ -1,0 +1,77 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>CEO Recap — AgentCall</title>
+<link href="https://fonts.bunny.net/css?family=inter:400,500,600,700|jetbrains-mono:400,500,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0a0b; --raised:#111114; --border:rgba(255,255,255,0.08);
+    --text:#f5f5f7; --muted:#8b8b94; --dim:#5a5a62;
+    --accent:#9dff6b; --orange:#ff7a3d;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:48px 56px;background:var(--bg);color:var(--text);
+       font-family:Inter,system-ui,sans-serif;font-size:18px;line-height:1.45}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+    background:radial-gradient(ellipse 70% 50% at 15% 0%,rgba(157,255,107,0.08),transparent 60%),
+               radial-gradient(ellipse 60% 40% at 90% 10%,rgba(255,122,61,0.08),transparent 60%);}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+  .badge{font-family:var(--mono);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;
+    color:var(--muted);padding:4px 10px;border-radius:999px;border:1px solid var(--border);
+    background:var(--raised)}
+  .badge::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;
+    background:var(--accent);margin-right:8px;vertical-align:middle}
+  h1{font-size:46px;line-height:1.05;letter-spacing:-0.025em;margin:0 0 6px;font-weight:600}
+  h1 .accent{color:var(--accent);font-style:italic;font-weight:500}
+  .sub{color:var(--muted);font-size:18px;margin:0 0 28px}
+  h2{font-size:18px;margin:28px 0 8px;color:var(--accent);font-family:var(--mono);
+     letter-spacing:0.04em;text-transform:uppercase;font-weight:600}
+  ul{margin:0 0 18px 0;padding-left:0;list-style:none}
+  li{padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:14px}
+  li:last-child{border-bottom:none}
+  li .k{font-family:var(--mono);font-size:13px;color:var(--orange);
+        flex-shrink:0;min-width:130px;letter-spacing:0.02em;text-transform:uppercase;
+        padding-top:2px}
+  li .v{flex:1}
+  li .v b{color:var(--text);font-weight:600}
+  .num{display:inline-block;width:24px;height:24px;border-radius:50%;
+       background:var(--accent);color:var(--bg);font-weight:700;font-size:13px;
+       text-align:center;line-height:24px;margin-right:8px;font-family:var(--mono)}
+  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--border);
+         color:var(--dim);font-size:14px;font-family:var(--mono)}
+</style></head>
+<body>
+<header><span class="badge">CEO recap · AgentCall</span></header>
+<h1>How to make this <span class="accent">fundable.</span></h1>
+<p class="sub">Strategic notes from the GStack CEO specialist · live in your meeting</p>
+
+<h2>Positioning</h2>
+<ul>
+  <li><span class="k">Wedge</span><span class="v">Pick <b>one</b> painful job — note-taking, dev standups, sales recaps, customer success. Own one before going wide.</span></li>
+  <li><span class="k">Frame</span><span class="v"><b>Bring your own AI teammate.</b> Zoom owns the meeting; you own the brain that joins.</span></li>
+  <li><span class="k">One-liner</span><span class="v"><b>"Ship code with your AI team in the meeting."</b> A verb, not a feature.</span></li>
+  <li><span class="k">Demo</span><span class="v">90-second Loom showing <b>one developer doing the work of five.</b></span></li>
+</ul>
+
+<h2>Three to nail before raising</h2>
+<ul>
+  <li><span class="k"><span class="num">1</span>Distribution</span><span class="v">How does a dev hear about it Tuesday and have it in standup Wednesday?</span></li>
+  <li><span class="k"><span class="num">2</span>Pricing</span><span class="v">Per-seat or per-meeting? Tells investors which game you're playing.</span></li>
+  <li><span class="k"><span class="num">3</span>Enemy</span><span class="v">Replacing the notetaker, the teammate, or the PM? Pick one. Hiding loses the round.</span></li>
+</ul>
+
+<h2>Find the enemy → find the budget</h2>
+<ul>
+  <li><span class="k">Note-taking</span><span class="v">Otter, Granola, Fireflies</span></li>
+  <li><span class="k">AI meeting</span><span class="v">Microsoft Copilot, Google Gemini-in-Meet</span></li>
+  <li><span class="k">Voice agent</span><span class="v">Vapi, Bland, Retell</span></li>
+</ul>
+
+<h2>Distribution playbook</h2>
+<ul>
+  <li><span class="k"><span class="num">1</span>Show HN</span><span class="v">Tuesday morning Pacific. 90s Loom that proves the demo.</span></li>
+  <li><span class="k"><span class="num">2</span>Open source</span><span class="v">MIT license. Devs install free → they become your salespeople.</span></li>
+  <li><span class="k"><span class="num">3</span>Cold reach</span><span class="v">DM 50 founders running async standups. Install it live in a meeting.</span></li>
+</ul>
+
+<footer>GStack × AgentCall · live recap</footer>
+</body></html>

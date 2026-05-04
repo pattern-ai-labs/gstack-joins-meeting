@@ -57,13 +57,23 @@ LOG="$SESSION/orchestrator.log"
 [[ -f "$CMDS" ]] || : > "$CMDS"
 [[ -f "$OUT"  ]] || : > "$OUT"
 
+# Optional: pre-arm a screenshare port so a runtime `screenshare.start`
+# can flip on screenshare without renegotiating the call. Set
+# SCREENSHARE_PORT=<port> in env before invoking this launcher.
+SCREENSHARE_ARG=()
+if [[ -n "${SCREENSHARE_PORT:-}" ]]; then
+  SCREENSHARE_ARG=(--screenshare-port "$SCREENSHARE_PORT")
+fi
+
 PYTHONUNBUFFERED=1 python3 "$BRIDGE" "$URL" \
   --name "$BOT_NAME" --voice "$VOICE" \
   --ui-port "$AVATAR_PORT" \
+  "${SCREENSHARE_ARG[@]}" \
+  --vad-timeout "${VAD_TIMEOUT:-0.8}" \
   --output "$OUT" \
   < <(tail -n 0 -f "$CMDS") \
   >> "$LOG" 2>&1 &
 
 BRIDGE_PID=$!
 echo "$BRIDGE_PID" >> "$SESSION/session.pid"
-echo "spawned id=$ID bot=$BOT_NAME voice=$VOICE pid=$BRIDGE_PID avatar_port=$AVATAR_PORT cmds=$CMDS out=$OUT"
+echo "spawned id=$ID bot=$BOT_NAME voice=$VOICE pid=$BRIDGE_PID avatar_port=$AVATAR_PORT screenshare_port=${SCREENSHARE_PORT:-} cmds=$CMDS out=$OUT"

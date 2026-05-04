@@ -1,0 +1,38 @@
+[
+  {
+    "id": "founding",
+    "name": "Founding Team",
+    "specialists": ["office-hours", "plan-ceo-review", "plan-eng-review"]
+  },
+  {
+    "id": "design",
+    "name": "Design Team",
+    "specialists": [
+      "plan-design-review",
+      "design-consultation",
+      "design-shotgun",
+      "design-html",
+      "design-review"
+    ]
+  },
+  {
+    "id": "build-review",
+    "name": "Build & Review",
+    "specialists": ["plan-eng-review", "review", "investigate"]
+  },
+  {
+    "id": "qa-ship",
+    "name": "QA & Ship",
+    "specialists": ["qa", "cso", "ship", "land-and-deploy", "canary"]
+  },
+  {
+    "id": "dx",
+    "name": "DX Team",
+    "specialists": ["plan-devex-review", "devex-review"]
+  },
+  {
+    "id": "retro",
+    "name": "Retro",
+    "specialists": ["retro"]
+  }
+]

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>gstack × AgentCall — your engineering team, on the call</title>
+    <title>GStack × AgentCall — your engineering team, on the call</title>
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin />
     <link
       href="https://fonts.bunny.net/css?family=inter:400,500,600,700|jetbrains-mono:400,500,600&display=swap"
@@ -190,15 +190,16 @@
       }
 
       /* ──────────────── Hero ──────────────── */
+      /* Stacked layout: hero text on top, meet URL row below, brief pill below
+         that. Keeps the hierarchy linear and pulls the specialists grid up. */
       .hero {
         padding: 14px 0 20px;
         display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 32px;
-        flex-wrap: wrap;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
       }
-      .hero-text { max-width: 540px; }
+      .hero-text { max-width: 720px; }
 
       .eyebrow {
         display: inline-flex;
@@ -250,14 +251,13 @@
         align-items: center;
         gap: 10px;
         padding: 8px 10px 8px 16px;
-        min-width: 360px;
-        flex: 1 1 360px;
+        width: 100%;
+        max-width: 520px;
         background: var(--bg-card);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        max-width: 640px;
         box-shadow: var(--shadow-card);
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
       }
@@ -475,9 +475,8 @@
       /* ──────────────── Brief textarea ──────────────── */
       /* Brief disclosure: collapsed pill that expands the textarea on click. */
       .brief-disclosure {
-        margin-top: 12px;
-        flex: 1 1 100%;
-        max-width: 100%;
+        margin-top: 0;
+        max-width: 520px;
       }
       .brief-disclosure > summary {
         list-style: none;
@@ -1253,8 +1252,8 @@
       <!-- Top bar -->
       <header class="topbar">
         <div class="brand">
-          <div class="brand-mark"><span>g</span></div>
-          <span>gstack</span>
+          <div class="brand-mark"><span>G</span></div>
+          <span>GStack</span>
           <span class="brand-x">×</span>
           <span>AgentCall</span>
         </div>
@@ -1268,8 +1267,8 @@
       <!-- Hero -->
       <section class="hero">
         <div class="hero-text">
-          <h1>Bring your <span class="accent">gstack specialist</span> on the call.</h1>
-          <p class="tagline">Drop any gstack specialist into your meeting as a voice agent.</p>
+          <h1>Bring your <span class="accent">GStack team</span> into the meeting.</h1>
+          <p class="tagline">Drop any GStack specialist into your meeting as a voice agent.</p>
         </div>
 
         <!-- Meeting URL input -->

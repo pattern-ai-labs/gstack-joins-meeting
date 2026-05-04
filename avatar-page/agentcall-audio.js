@@ -83,6 +83,20 @@ class AgentCallAudio {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)({
         sampleRate: this.sampleRate
       });
+      // Headless browsers (FirstCall) and modern desktop Chrome both start
+      // AudioContext in "suspended" state until a user gesture. We have no
+      // user gesture, so we MUST explicitly resume — otherwise queued
+      // buffers play silently and the meeting hears nothing.
+      try {
+        if (this.ctx.state === "suspended") {
+          this.ctx.resume();
+        }
+      } catch (_) {}
+      // Diagnostic — surface the audio context state to the avatar log so
+      // we can confirm what FirstCall's headless Chrome actually does.
+      try {
+        new Image().src = "/dbg.gif?audioctx=" + encodeURIComponent(this.ctx.state || "?");
+      } catch (_) {}
     }
 
     // Decode base64 → PCM bytes → Float32 samples.
