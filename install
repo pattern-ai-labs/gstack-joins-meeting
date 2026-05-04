@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# gstack-agentcall installer — symlinks the cloned repo into the user's
+# Claude Code skills dir so SKILL.md is auto-discovered.
+#
+# Usage:
+#   git clone --depth 1 https://github.com/anandpattern/gstack-agentcall.git \
+#     ~/gstack-agentcall
+#   ~/gstack-agentcall/install
+#
+# Idempotent — re-run any time (e.g. after `git pull`).
+
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_NAME="gstack-agentcall"
+SKILLS_DIR="${HOME}/.claude/skills"
+TARGET="${SKILLS_DIR}/${SKILL_NAME}"
+
+# 1. Sanity: is this actually the gstack-agentcall repo?
+if [[ ! -f "${HERE}/SKILL.md" || ! -f "${HERE}/server.py" ]]; then
+  echo "FATAL: ${HERE} doesn't look like the gstack-agentcall repo" >&2
+  echo "       (expected SKILL.md and server.py at the root)"        >&2
+  exit 1
+fi
+
+# 2. Make the skills dir, symlink ourselves in.
+mkdir -p "${SKILLS_DIR}"
+if [[ -L "${TARGET}" || -e "${TARGET}" ]]; then
+  echo "  · ${TARGET} already exists — refreshing"
+  rm -rf "${TARGET}"
+fi
+ln -s "${HERE}" "${TARGET}"
+echo "  ✓ symlinked  ${TARGET} → ${HERE}"
+
+# 3. Python sanity — both modules import cleanly.
+if ! ( cd "${HERE}" && python3 -c "import server, specialist_runner" ) 2>/dev/null; then
+  echo "  ! python3 -c 'import server, specialist_runner' failed" >&2
+  echo "    Make sure Python 3.10+ is on PATH and try again."     >&2
+  exit 2
+fi
+echo "  ✓ python imports OK"
+
+# 4. AgentCall key check — warn but don't block.
+CONFIG="${HOME}/.agentcall/config.json"
+if [[ ! -f "${CONFIG}" && -z "${AGENTCALL_API_KEY:-}" ]]; then
+  cat <<EOF
+
+  ⚠  AgentCall key not found.
+
+  Sign up at https://agentcall.dev, then:
+
+      mkdir -p ~/.agentcall
+      cat > ~/.agentcall/config.json <<JSON
+      { "api_key": "ak_ac_..." }
+      JSON
+
+  …or  export AGENTCALL_API_KEY="ak_ac_..."  in your shell rc.
+EOF
+fi
+
+# 5. Vendored bridges expected at vendor/bridge.py and vendor/bridge-visual.py.
+for f in vendor/bridge.py vendor/bridge-visual.py; do
+  if [[ ! -f "${HERE}/${f}" ]]; then
+    echo "  ! missing ${f} — re-run: git pull && bash install" >&2
+    exit 3
+  fi
+done
+echo "  ✓ vendored bridges in place"
+
+cat <<EOF
+
+  Skill installed.
+
+  Try it from Claude Code:
+
+      "Bring the CEO into https://meet.google.com/<your-meet>"
+
+  Or open the dashboard manually:
+
+      python3 ${HERE}/server.py
+      open http://localhost:8765
+
+EOF
