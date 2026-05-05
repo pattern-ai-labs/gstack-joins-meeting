@@ -508,6 +508,14 @@ class Runner:
         The outbox is a JSONL command stream. Three command shapes:
 
           {"text": "..."}                   → tts.speak (default)
+          {"text": "...",
+           "also_chat": true}               → tts.speak + meeting.send_chat
+                                              (workaround for sessions where
+                                              AgentCall's TTS-to-WebRTC audio
+                                              injection is silent but chat
+                                              still reaches the room — every
+                                              spoken line is mirrored into
+                                              the meeting chat panel)
           {"action": "send_chat",
            "message": "..."}                → meeting.send_chat
           {"action": "screenshare.start",
@@ -583,6 +591,14 @@ class Runner:
             self.log(f"← outbox: {text[:80]!r}")
             self.send_cmd(self._tts_speak_cmd(text, voice=voice,
                                               destination=destination))
+            # Optional chat mirror — useful when AgentCall's TTS-to-WebRTC
+            # audio path silently drops audio (tts.done fires but no one
+            # hears anything). Chat goes through a different API path that
+            # is empirically reliable, so the spoken content still reaches
+            # the room as readable text. Brain opts in per-message.
+            if msg.get("also_chat"):
+                self.log(f"← outbox: also_chat mirror {text[:60]!r}")
+                self.send_cmd({"command": "send_chat", "message": text})
 
     # ── main ───────────────────────────────────────────────────────────────
     def install_signal_handlers(self) -> None:
