@@ -381,8 +381,8 @@ turned it into a slide the bot can screenshare.
 ## Try it yourself in 60 seconds
 
 ```bash
-git clone https://github.com/<your-handle>/gstack-v2  # to be public for the application
-cd gstack-v2
+git clone https://github.com/pattern-ai-labs/gstack-joins-meeting
+cd gstack-joins-meeting
 python3 server.py                                      # starts dashboard + avatar server
 # open http://localhost:8765
 # paste a Meet URL → click "Dispatch CEO Review"

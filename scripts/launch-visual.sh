@@ -2,7 +2,7 @@
 # launch-visual.sh — spawn bridge-visual.py for a specialist in avatar mode.
 #
 # Adapted from boardroom's launch-visual.sh. The avatar HTML is shared
-# across all specialists (gstack-v2/avatar-page/ serves name-keyed SVG);
+# across all specialists (gstack-joins-meeting/avatar-page/ serves name-keyed SVG);
 # each bot just tunnels to the same local http.server on $AVATAR_PORT and
 # FirstCall appends ?name=<bot_name> so the page picks the right avatar.
 #

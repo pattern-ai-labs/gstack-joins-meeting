@@ -292,19 +292,18 @@ gstack-agentcall/
 
 ## Install
 
-From inside Claude Code:
+One line — from any shell:
 
 ```bash
-git clone --depth 1 https://github.com/anandpattern/gstack-agentcall.git \
-  ~/gstack-agentcall && \
-  ~/gstack-agentcall/install
+curl -fsSL https://raw.githubusercontent.com/pattern-ai-labs/gstack-joins-meeting/main/install | bash
 ```
 
-The installer symlinks the repo into `~/.claude/skills/gstack-agentcall/`
-so SKILL.md is auto-discovered. Verify:
+Clones into `~/gstack-joins-meeting` and symlinks it as a Claude Code
+skill at `~/.claude/skills/gstack-joins-meeting/` so SKILL.md is
+auto-discovered. Verify:
 
 ```bash
-ls -la ~/.claude/skills/gstack-agentcall/SKILL.md
+ls -la ~/.claude/skills/gstack-joins-meeting/SKILL.md
 ```
 
 ---

@@ -5,8 +5,8 @@ Short version: keep it stdlib, keep it one-file-per-concept, edit `specialists.j
 ## Run locally
 
 ```bash
-git clone https://github.com/<you>/gstack-v2.git
-cd gstack-v2
+git clone https://github.com/pattern-ai-labs/gstack-joins-meeting.git
+cd gstack-joins-meeting
 export AGENTCALL_API_KEY="ak_ac_..."
 python3 server.py
 ```

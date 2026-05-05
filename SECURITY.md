@@ -1,4 +1,4 @@
-# Security review — gstack-v2
+# Security review — gstack-joins-meeting
 
 This is a developer-tool prototype that serves a localhost dashboard, spawns subprocesses to drive third-party meeting bots, and tunnels a local HTTP page out through AgentCall's WebSocket relay so it can be rendered as a video feed inside Google Meet / Zoom / Teams. The realistic attacker is **a malicious web page the developer happens to be visiting at the same time as `server.py` is running** (cross-origin requests against `127.0.0.1:8765`), or **a crafted payload smuggled through the meeting transcript / Claude session into the bot's outbox file**. The codebase already escapes HTML in the dashboard, validates specialist ids against a fixed allow-list, and quotes all subprocess arguments — there is no straightforward command-injection or stored-XSS path. The findings below are the ones that survive the "name a real attacker performing the action" filter.
 

@@ -42,21 +42,19 @@ It is a prototype. It works. It is also the smallest possible thing you can put 
 
 ### Install
 
+One line — clones the repo to `~/gstack-joins-meeting` and registers it as a Claude Code skill:
+
 ```bash
-git clone https://github.com/<you>/gstack-v2.git
-cd gstack-v2
+curl -fsSL https://raw.githubusercontent.com/pattern-ai-labs/gstack-joins-meeting/main/install | bash
+```
+
+Then set your AgentCall key:
+
+```bash
 export AGENTCALL_API_KEY="ak_ac_..."
 ```
 
-That's it. There's nothing to build, no `requirements.txt`, no `package.json`. The server is one file, the dashboard is one file, the runner is one file.
-
-If you're missing the AgentCall skill and want to test offline, the vendored bridges in `vendor/` only need:
-
-```bash
-pip install aiohttp websockets
-```
-
-The launchers prefer `vendor/bridge.py` over the installed skill copy by default, so a fresh clone Just Works. Override with `BRIDGE_SCRIPT=/path/to/bridge.py` (and `BRIDGE_VISUAL_SCRIPT=...`) if you want to force a specific copy.
+That's it. There's nothing to build, no `requirements.txt`, no `package.json`. The server is one file, the dashboard is one file, the runner is one file. If the vendored bridges need their deps: `pip install aiohttp websockets`.
 
 ---
 
