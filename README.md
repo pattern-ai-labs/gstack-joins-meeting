@@ -208,6 +208,12 @@ This is a prototype shipped to provoke a reaction, not a production system. The 
 
 ---
 
+## Thanks
+
+Huge thanks to **[Garry Tan](https://github.com/garrytan)**, President & CEO of Y Combinator, for building [gstack](https://github.com/garrytan/gstack) and open-sourcing it — the 18 specialist personas at the heart of this project are his work. This prototype only exists because gstack already nailed the hard part: writing opinionated, in-character prompts for the people every founder wishes they had on speed dial. Thanks also to Garry for his broader contributions to the tech ecosystem — the founders he funds, the tools he ships, and the public conversations he hosts that pull all of it forward.
+
+---
+
 ## License
 
 MIT. See `LICENSE`.
