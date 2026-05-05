@@ -68,7 +68,7 @@ fi
 PYTHONUNBUFFERED=1 python3 "$BRIDGE" "$URL" \
   --name "$BOT_NAME" --voice "$VOICE" \
   --ui-port "$AVATAR_PORT" \
-  "${SCREENSHARE_ARG[@]}" \
+  ${SCREENSHARE_ARG[@]+"${SCREENSHARE_ARG[@]}"} \
   --vad-timeout "${VAD_TIMEOUT:-0.8}" \
   --output "$OUT" \
   < <(tail -n 0 -f "$CMDS") \
