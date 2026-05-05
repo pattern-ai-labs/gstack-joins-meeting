@@ -79,7 +79,11 @@ ROOT = Path(__file__).resolve().parent
 SCRIPTS_DIR = ROOT / "scripts"
 SESSIONS_ROOT = ROOT / "sessions"
 SESSIONS_ROOT.mkdir(parents=True, exist_ok=True)
-AVATAR_UI_PORT = 3000  # shared avatar-page server (serves /avatars/<id>.svg keyed by ?name=)
+AVATAR_UI_PORT_PREFERRED = 3000   # preferred starting port for the avatar-page server
+AVATAR_UI_PORT_MAX_TRIES = 10     # walk this many ports forward looking for a free/ours one
+AVATAR_UI_PORT_MARKER = "gstack-avatar-page"  # HTML marker proving the listener is ours
+AVATAR_UI_PORT = AVATAR_UI_PORT_PREFERRED     # resolved at boot by _ensure_avatar_server();
+                                              # /dispatch reads this to pass --avatar-port to runners
 
 
 def _find_bridge() -> Path:
@@ -706,51 +710,105 @@ class Handler(BaseHTTPRequestHandler):
 # Main
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _avatar_server_alive() -> bool:
-    """Return True if something is listening on AVATAR_UI_PORT."""
-    import socket
+def _avatar_server_is_ours(port: int) -> bool:
+    """Return True iff a *gstack* avatar-page server is reachable on *port*.
+
+    A bare TCP-connect test (the previous behavior) also succeeded against
+    any other process bound to the port — e.g. a Next.js dev server,
+    a docs preview, anything. The bot would then tunnel to that foreign
+    listener and render its empty shell instead of our avatar SVG.
+    Here we GET / and require AVATAR_UI_PORT_MARKER in the response body
+    so we only reuse a listener that is actually serving avatar-page/index.html.
+    """
+    import urllib.request
     try:
-        with socket.create_connection(("127.0.0.1", AVATAR_UI_PORT), timeout=0.5):
-            return True
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/", timeout=0.8
+        ) as resp:
+            body = resp.read(4096).decode("utf-8", errors="replace")
+            return AVATAR_UI_PORT_MARKER in body
     except Exception:
         return False
+
+
+def _port_is_free(port: int) -> bool:
+    """Return True if no socket is listening on (127.0.0.1, port)."""
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.3):
+            return False
+    except Exception:
+        return True
 
 
 def _ensure_avatar_server() -> subprocess.Popen | None:
     """Start a local HTTP server for the avatar page if one isn't running.
 
-    Avatar-mode bots tunnel to localhost:AVATAR_UI_PORT through AgentCall;
-    if no server is listening, bridge-visual will 404 and no avatar renders.
+    Walks AVATAR_UI_PORT_PREFERRED .. PREFERRED+MAX_TRIES-1 and either:
+      • reuses an existing gstack avatar-page server (verified via marker), or
+      • binds a brand-new http.server on the first port that is both free
+        AND where the resulting bind serves our avatar-page/index.html.
+
+    Updates module-level AVATAR_UI_PORT to whatever we ended up using, so
+    subsequent /dispatch calls pass the right --avatar-port to runners.
     """
-    if _avatar_server_alive():
-        print(f"  ✓ avatar page already serving on :{AVATAR_UI_PORT}")
-        return None
+    global AVATAR_UI_PORT
 
     avatar_dir = ROOT / "avatar-page"
     if not (avatar_dir / "index.html").exists():
-        print(f"[warn] avatar-page/ missing — avatar mode will not work",
+        print("[warn] avatar-page/ missing — avatar mode will not work",
               file=sys.stderr)
         return None
 
-    log_path = LOG_DIR / f"avatar-server.{int(time.time())}.log"
-    log_fh = open(log_path, "ab", buffering=0)
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "http.server", str(AVATAR_UI_PORT),
-         "--bind", "127.0.0.1"],
-        stdin=subprocess.DEVNULL,
-        stdout=log_fh,
-        stderr=log_fh,
-        cwd=str(avatar_dir),
-        start_new_session=True,
-    )
-    # Give it a moment to bind.
-    time.sleep(0.5)
-    if _avatar_server_alive():
-        print(f"  ✓ avatar page started on :{AVATAR_UI_PORT} (pid={proc.pid})")
-    else:
-        print(f"[warn] avatar page failed to bind on :{AVATAR_UI_PORT} — see {log_path}",
+    last_proc: subprocess.Popen | None = None
+    for offset in range(AVATAR_UI_PORT_MAX_TRIES):
+        port = AVATAR_UI_PORT_PREFERRED + offset
+
+        # Case 1: an avatar server is already serving here — reuse it.
+        if _avatar_server_is_ours(port):
+            AVATAR_UI_PORT = port
+            print(f"  ✓ avatar page already serving on :{port}")
+            return None
+
+        # Case 2: something else owns this port — skip without disturbing it.
+        if not _port_is_free(port):
+            print(f"  · :{port} taken by something else (not gstack) — trying :{port + 1}")
+            continue
+
+        # Case 3: port looks free — try to bind a new server on it.
+        log_path = LOG_DIR / f"avatar-server.{int(time.time())}.log"
+        log_fh = open(log_path, "ab", buffering=0)
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "http.server", str(port),
+             "--bind", "127.0.0.1"],
+            stdin=subprocess.DEVNULL,
+            stdout=log_fh,
+            stderr=log_fh,
+            cwd=str(avatar_dir),
+            start_new_session=True,
+        )
+        # Poll up to ~2s for the bind to land — http.server can be slow
+        # to start on cold cache and `time.sleep(0.5)` was occasionally racy.
+        for _ in range(20):
+            time.sleep(0.1)
+            if _avatar_server_is_ours(port):
+                AVATAR_UI_PORT = port
+                print(f"  ✓ avatar page started on :{port} (pid={proc.pid})")
+                return proc
+        # Bind raced or something else jumped in; tear it down and try next.
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+        last_proc = proc
+        print(f"[warn] avatar page failed to start on :{port} — see {log_path}",
               file=sys.stderr)
-    return proc
+
+    print(f"[warn] no usable avatar port found in "
+          f"{AVATAR_UI_PORT_PREFERRED}..{AVATAR_UI_PORT_PREFERRED + AVATAR_UI_PORT_MAX_TRIES - 1}; "
+          f"avatar-mode bots will render blank",
+          file=sys.stderr)
+    return last_proc
 
 
 def _regen_specialists_js() -> None:
