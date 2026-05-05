@@ -1,32 +1,159 @@
 ---
 name: gstack-agentcall
-description: Bring GStack specialists into a Google Meet / Zoom / Teams call as voice bots. Use this skill when the user asks to "bring the CEO / CSO / QA / Eng Manager into the meeting", "dispatch the design team", "have a specialist review my pitch live", or otherwise wants a GStack persona to join a real meeting with a 3D avatar and respond in character. Each specialist becomes a separate participant in the call, hears the room, and engages on its domain. Built on top of AgentCall (agentcall.dev) and the gstack roster (github.com/garrytan/gstack).
+description: Bring GStack specialists into a Google Meet / Zoom / Teams call as voice bots, AND act as their brain. Use this skill when the user asks to "bring the CEO / CSO / QA / Eng Manager into the meeting", "dispatch the design team", "have a specialist review my pitch live", or otherwise wants a GStack persona to join a real meeting with a 3D avatar and respond in character. ALSO use this skill when you notice gstack specialists are already running on this machine (active.json non-empty) and need a brain — the specialists go silent without a Claude session powering their replies. Each dispatched specialist becomes its own meeting participant with a unique avatar, hears the room, and only speaks when YOU (Claude) write a reply to its outbox file.
 ---
 
 # gstack-agentcall — voice specialists in the meeting
 
-This skill lets Claude Code dispatch any GStack specialist into a live
-Google Meet / Zoom / Teams call as a voice bot. Each specialist joins
-as its own meeting participant with a unique 3D avatar, hears the
-room, and replies in character through TTS.
+> **Read the next section before you do anything else.**
+> The dispatch endpoint is dumb on its own — without YOU running the
+> brain loop, specialists join silently and never engage.
 
-**18 specialists are pre-defined** — full list in `data/specialists.json`:
+---
 
-| Role | Voice | Glyph |
-|---|---|---|
-| CEO / Founder | am_adam | ♛ |
-| Engineering Manager | bm_george | ⎇ |
-| Senior Designer | af_sarah | ◈ |
-| Chief Security Officer | am_michael | ⛨ |
-| QA Lead | af_sarah | ✓ |
-| Staff Engineer (code review) | bm_lewis | ⌘ |
-| Debugger | am_adam | ⌕ |
-| YC Office Hours Partner | am_michael | YC |
-| Release Engineer | bm_george | ▲ |
-| …and 9 more (Design Partner, DX Lead, Designer Who Codes, etc.) |
+## YOU ARE THE BRAIN. (read this first)
 
-**6 team presets**: Founding Team, Design Team, Build & Review,
-QA & Ship, DX Team, Retro. Drop the whole team in with one call.
+When this skill is engaged, **Claude is the intelligence layer for every
+dispatched specialist**. There is no LLM hidden in the runner. The
+runner only:
+
+1. spawns the bridge (so the bot enters the meeting)
+2. forwards every meeting `user.message` event into a shared inbox file
+3. tails an outbox file per specialist, speaks anything you write there
+
+If no Claude session is monitoring the inbox, **the bot just sits
+there in the meeting saying nothing after its initial intro line.**
+That is the failure mode you must prevent. Don't dispatch and walk
+away; dispatch and immediately enter the loop below.
+
+### The mandatory loop
+
+The moment you trigger a dispatch (or detect that a dispatch already
+happened — see "orphan rescue" below), do these three things in this
+exact order, in the same turn:
+
+#### 1. Confirm or start the dashboard server
+
+```bash
+SKILL="${HOME}/.claude/skills/gstack-agentcall"
+if ! curl -sf -m 1 http://127.0.0.1:8765/ -o /dev/null; then
+  (python3 "$SKILL/server.py" > /tmp/gstack-agentcall.log 2>&1) &
+  sleep 2
+fi
+```
+
+#### 2. Start a Monitor on the intelligence inbox
+
+This is the line that turns Claude into the brain. Each new line
+written to `inbox.jsonl` becomes a notification you'll receive while
+you keep working — no polling needed.
+
+```
+Use the Monitor tool with:
+  description: "Specialist inbox (Claude is the brain)"
+  persistent:  true
+  timeout_ms:  3600000   (1 hour; re-arm if longer)
+  command: |
+    tail -n 0 -F /tmp/gstack-intelligence-$(id -u)/inbox.jsonl
+```
+
+You MUST start this monitor BEFORE telling the user the bot is
+dispatched. Without it you will not see what the room is saying.
+
+#### 3. Reply to every meeting message in character
+
+Each notification looks like:
+
+```json
+{"ts": 1730000000.0, "specialist_id": "plan-ceo-review",
+ "name": "CEO", "role": "CEO",
+ "description": "I pressure-test the strategy …",
+ "speaker": "Anand Balakrishnan",
+ "text": "What do you think of the AgentCall idea?"}
+```
+
+To reply, append a JSON line to that specialist's outbox:
+
+```bash
+BUS=/tmp/gstack-intelligence-$(id -u)/outbox
+echo '{"text":"<your in-character reply>"}' >> "$BUS/<specialist_id>.jsonl"
+```
+
+The runner picks the line up within ~250ms, sends it through the
+bridge as `tts.speak`, and the specialist speaks it into the meeting.
+
+**Rules for replies (these matter — break them and the experience
+falls apart):**
+
+- **Stay in character.** The CEO challenges strategy in blunt one-
+  liners. The CSO is paranoid and specific. The Senior Designer
+  talks hierarchy and rhythm. The QA Lead is skeptical. Look at the
+  specialist's `description` and `role` in the inbox event — that's
+  the persona.
+- **Keep it short.** 1–3 sentences. TTS over voice is unforgiving;
+  long monologues feel robotic. Use meeting chat (see below) for
+  anything URL-shaped or longer than ~30 words.
+- **Stay silent on filler.** "Yeah", "uh", "okay", and STT-garbled
+  noise should NOT trigger TTS. Only reply when the message is a
+  real question or a direct address.
+- **Don't talk over yourself.** The cross-bot speech lock auto-
+  serializes between specialists, but for a single specialist
+  don't queue 5 lines at once — let `tts.done` arrive before the
+  next reply.
+- **If the user addresses Claude directly** (not a dispatched
+  specialist), reply through your own bridge if you're in the
+  call — never through a specialist's outbox.
+- **On STT noise, ignore.** Voice STT often produces fragments like
+  "Mm hmm" or non-English phonetic noise. Standing by is a valid
+  response.
+
+#### 4. Other outbox actions (use sparingly)
+
+```bash
+# Send a chat message in the meeting (for URLs, code, long lists):
+echo '{"action":"send_chat","message":"https://github.com/foo/bar"}' \
+  >> "$BUS/<spec_id>.jsonl"
+
+# Avatar mode only — start screensharing a URL or a local port:
+echo '{"action":"screenshare.start","url":"https://example.com/recap"}' \
+  >> "$BUS/<spec_id>.jsonl"
+echo '{"action":"screenshare.start","port":3001}' \
+  >> "$BUS/<spec_id>.jsonl"
+echo '{"action":"screenshare.stop"}' \
+  >> "$BUS/<spec_id>.jsonl"
+```
+
+#### 5. Recall when done
+
+The user will signal end-of-call ("thanks", "we're done", "leave the
+call"). Always run:
+
+```bash
+curl -sX POST http://127.0.0.1:8765/recall \
+  -H 'content-type: application/json' \
+  -d '{"all": true}'
+```
+
+Failing to recall leaves bots in the meeting until the AgentCall
+alone-timeout (~2 min) — and bills the user for those 2 min.
+
+---
+
+## Orphan rescue (a specialist is dispatched but has no brain)
+
+If the user dispatched specialists from the dashboard UI in another
+window and now asks "why isn't the CEO responding?", they have
+specialists running with no Claude session attached. Adopt them:
+
+```bash
+# Are there orphans?
+cat /tmp/gstack-specialists-$(id -u)/active.json
+# If "runners" is non-empty, start the Monitor on inbox.jsonl
+# (step 2 above) and you're now their brain.
+```
+
+Then say something like *"I see the CEO is dispatched but had no
+brain attached — I'm the brain now, ask anything."* and run the loop.
 
 ---
 
@@ -40,72 +167,41 @@ Trigger phrases (any of these):
 - "let me get a security review of this — bring CSO"
 - "send the founding team to my standup"
 - "bring my GStack team into the call"
+- "why isn't the CEO responding?" (orphan rescue path)
 - "recall all the specialists" / "get everyone out of the meeting"
 
 **Do NOT** invoke this skill for:
 - Just running gstack slash commands locally (those are `/cso`, `/review`,
-  etc. inside the gstack skill itself — text only, no voice bot).
+  etc. inside the upstream gstack skill — text only, no voice bot).
 - Generic AgentCall use (joining a meeting as Claude itself — use the
   `agentcall` / `join-meeting` skill for that).
 
 ---
 
-## Prerequisites the skill expects
+## Dispatching — the API surface
 
-1. **AgentCall API key** at `~/.agentcall/config.json` or
-   `$AGENTCALL_API_KEY`. Sign up at https://agentcall.dev.
-2. **The repo cloned somewhere on disk.** The install script (below)
-   symlinks it under `~/.claude/skills/gstack-agentcall/`.
-3. **Python 3.10+.** No Python deps outside stdlib.
-4. **The user is the host of the meeting** — bots arrive in the lobby
-   and must be admitted.
-
----
-
-## How Claude should run this skill
-
-### Step 0 — make sure the dashboard server is up
-
-The skill assumes a local HTTP server on port `8765` exposing
-`POST /dispatch` and `POST /recall`. If it's not running, start it.
+`POST /dispatch` to start one or more specialists:
 
 ```bash
-# Skill root: ~/.claude/skills/gstack-agentcall/
-SKILL="${HOME}/.claude/skills/gstack-agentcall"
-if ! curl -sf -m 1 http://127.0.0.1:8765/ -o /dev/null; then
-  (python3 "$SKILL/server.py" > /tmp/gstack-agentcall.log 2>&1) &
-  sleep 2
-fi
+SPEC_IDS='["plan-ceo-review"]'    # or ["plan-ceo-review","plan-eng-review","cso"]
+MEET_URL="https://meet.google.com/abc-defg-hij"
+curl -sX POST http://127.0.0.1:8765/dispatch \
+  -H 'content-type: application/json' \
+  -d "$(python3 -c "import json,sys; print(json.dumps({
+        'meetUrl': sys.argv[1],
+        'specialists': json.loads(sys.argv[2]),
+        'mode': 'avatar',
+      }))" "$MEET_URL" "$SPEC_IDS")"
 ```
 
-The server auto-spawns the avatar page server on port 3000 the first
-time it boots. Both bind to `127.0.0.1` only.
-
-### Step 1 — dispatch a specialist (or team)
-
-`POST /dispatch` with JSON:
-
-```json
-{
-  "meetUrl": "https://meet.google.com/abc-defg-hij",
-  "specialists": ["plan-ceo-review"],
-  "mode": "avatar",
-  "brief": "optional: paste the agenda or doc link here"
-}
-```
-
-Specialist ids are the keys in `data/specialists.json`:
+Specialist ids (single source of truth: `data/specialists.json`):
 `office-hours`, `plan-ceo-review`, `plan-eng-review`,
 `plan-design-review`, `plan-devex-review`, `design-consultation`,
 `design-shotgun`, `design-html`, `review`, `investigate`,
 `design-review`, `devex-review`, `qa`, `cso`, `ship`,
 `land-and-deploy`, `canary`, `retro`.
 
-`mode` defaults to `"avatar"` (visible 3D character + voice). Pass
-`"audio"` to skip the avatar (faster join, no video).
-
-For a whole team, pass the team's specialist list. Team presets are
-in `data/teams.json`:
+Team presets (`data/teams.json`):
 
 | Team id | Specialists |
 |---|---|
@@ -116,97 +212,12 @@ in `data/teams.json`:
 | `dx` | plan-devex-review, devex-review |
 | `retro` | retro |
 
-```bash
-curl -sX POST http://127.0.0.1:8765/dispatch \
-  -H 'content-type: application/json' \
-  -d "$(jq -n --arg url "$MEET_URL" --argjson ids '["plan-ceo-review"]' \
-        '{meetUrl: $url, specialists: $ids, mode: "avatar"}')"
-```
+`mode`:
+- `"avatar"` (default) — visible 3D character + voice. Slower join (~30s).
+- `"audio"` — voice only, no avatar. Faster.
 
-The response includes per-specialist PIDs and a `sessionDir`. The bot
-takes ~30s to enter the meeting (Google Meet takes longest). The user
-must admit the bot from the lobby — tell them this every time.
-
-### Step 2 — drive the specialist while it's in the call
-
-Each specialist becomes a `runner` process that tails its own outbox at
-`/tmp/gstack-intelligence-<uid>/outbox/<spec_id>.jsonl`. Append a JSON
-line and the runner forwards it to the bridge.
-
-```bash
-BUS=/tmp/gstack-intelligence-$(id -u)/outbox
-# Speak in character:
-echo '{"text":"Cut the thing you spent the most time defending."}' \
-  >> "$BUS/plan-ceo-review.jsonl"
-# Drop a chat message:
-echo '{"action":"send_chat","message":"https://example.com/spec"}' \
-  >> "$BUS/plan-ceo-review.jsonl"
-# Start screenshare (avatar mode only, port or url):
-echo '{"action":"screenshare.start","port":3001}' \
-  >> "$BUS/plan-ceo-review.jsonl"
-echo '{"action":"screenshare.stop"}' \
-  >> "$BUS/plan-ceo-review.jsonl"
-```
-
-Cross-bot speech lock at `/tmp/gstack-intelligence-<uid>/speaking.lock`
-ensures only one specialist talks at a time. The lock auto-releases
-on `tts.done` and is force-stolen after 12s if the holder is stuck.
-
-### Step 3 — observe what's happening in the meeting
-
-Each specialist's transcript stream lands in
-`/tmp/gstack-intelligence-<uid>/inbox.jsonl` (the listener forwards
-every meeting `user.message` event there). Tail it to know what the
-room is saying.
-
-```bash
-tail -f /tmp/gstack-intelligence-$(id -u)/inbox.jsonl
-```
-
-Per-specialist event streams are at
-`<sessionDir>/<spec_id>.jsonl` — full bridge events including
-`tts.done`, `participant.joined`, `screenshare.started`, etc.
-
-### Step 4 — recall when done
-
-```bash
-curl -sX POST http://127.0.0.1:8765/recall \
-  -H 'content-type: application/json' \
-  -d '{"all": true}'
-# Or specific ones:
-curl -sX POST http://127.0.0.1:8765/recall \
-  -H 'content-type: application/json' \
-  -d '{"specialists": ["plan-ceo-review", "cso"]}'
-```
-
-Recall is **defense-in-depth**: it verifies each PID still belongs to
-a `specialist_runner.py` before SIGTERM, so a stale PID after reboot
-won't kill an unrelated process.
-
----
-
-## Active participation rules (CRITICAL)
-
-When the skill is engaged and specialists are in the meeting:
-
-1. **The room is live.** Treat every `inbox.jsonl` line as a real
-   participant speaking. Latency matters — reply within seconds.
-2. **One specialist per outbox line.** Don't queue 10 messages in
-   one go; the speech lock will serialize them, but that bunches
-   the bot's voice unnaturally. Wait for `tts.done` before queueing
-   the next line for the same specialist.
-3. **Stay in character.** Each specialist has a `description` and a
-   `role` in `data/specialists.json`. Reply in their voice. The CEO
-   challenges strategy. The CSO finds exploits. The Senior Designer
-   talks about hierarchy and rhythm. **Do not break character.**
-4. **Don't speak unless addressed or it's clearly relevant.** The
-   default is silence. The user typed "bring the CEO in" — the CEO
-   should respond when the conversation touches strategy, OR when
-   the user says "CEO, what do you think?" Never fire a TTS just to
-   fill silence.
-5. **Always recall before exiting.** Killing the runner without
-   `/recall` leaves the bot in the meeting until the AgentCall
-   alone-timeout (2 min) — billing the user.
+The user must admit each bot from the meeting lobby. Tell them:
+*"Bot is on the way — admit it from your Meet lobby (~30s)."*
 
 ---
 
@@ -215,36 +226,42 @@ When the skill is engaged and specialists are in the meeting:
 ### "Bring the CEO into this meeting and have it pressure-test my pitch"
 
 ```
-1. POST /dispatch {meetUrl, ["plan-ceo-review"], mode: "avatar"}
-2. Tell the user: "CEO is on the way (~30s). Admit it from the Meet lobby."
-3. Tail inbox.jsonl. When user pitches, write CEO replies to outbox.
-4. Stay in character (strategic challenges, not technical).
-5. On user's "we're done" / "thanks", POST /recall {all: true}.
+1. Start dashboard server if not running.
+2. POST /dispatch {meetUrl, ["plan-ceo-review"], mode:"avatar"}.
+3. Start Monitor on inbox.jsonl (PERSISTENT, 1h).
+4. Tell user: "CEO is on the way — admit from lobby."
+5. When user pitches → write CEO reply to
+   /tmp/gstack-intelligence-$(id -u)/outbox/plan-ceo-review.jsonl
+6. Stay strategic. Don't review code, that's not the CEO's beat.
+7. On "thanks" / "we're done" → POST /recall {all:true}.
 ```
 
 ### "Get the QA team to break what we just shipped"
 
 ```
-1. POST /dispatch {meetUrl, ["qa", "cso"], mode: "avatar"}
-2. QA challenges happy-path; CSO challenges auth/secrets.
-3. Use {"action":"send_chat","message":"..."} to paste exact failing curls.
+1. POST /dispatch {meetUrl, ["qa","cso"], mode:"avatar"}.
+2. Start inbox Monitor.
+3. QA challenges happy paths and asks for null/empty cases.
+   CSO challenges auth, secrets, exposed surfaces.
+4. Use {"action":"send_chat","message":"…curl repro…"} for repros.
 ```
 
 ### "Bring my whole founding team to my standup"
 
 ```
-1. POST /dispatch {meetUrl, ["office-hours","plan-ceo-review","plan-eng-review"], mode: "avatar"}
-2. Each one engages on their domain only; let conversations cross.
-3. The cross-bot speech lock serializes them — no overlap.
+1. POST /dispatch {meetUrl, ["office-hours","plan-ceo-review","plan-eng-review"]}.
+2. Start inbox Monitor. Three specialists, three personas.
+3. Each one engages on its domain only. Cross-bot speech lock
+   serializes their TTS so they don't talk over each other.
 ```
 
-### "Send a recap of our discussion as a screenshare"
+### "Send a recap of what we just discussed as a screenshare"
 
 ```
-1. Generate an HTML page with the recap into recap-page/index.html.
-2. Spawn a python -m http.server on port 3001 from recap-page/.
-3. Append {"action":"screenshare.start","port":3001} to the CEO's outbox.
-4. The avatar bot will start sharing the recap page in the meeting.
+1. Generate the recap as HTML at recap-page/index.html.
+2. (cd recap-page && python3 -m http.server 3001) &
+3. Append {"action":"screenshare.start","port":3001} to a specialist's outbox.
+4. The avatar bot starts screensharing the recap page.
 ```
 
 ---
@@ -253,7 +270,7 @@ When the skill is engaged and specialists are in the meeting:
 
 ```
 gstack-agentcall/
-├── SKILL.md               ← this file
+├── SKILL.md               ← this file (you are reading it)
 ├── install                ← installer (symlinks repo → ~/.claude/skills/)
 ├── server.py              ← dashboard + /dispatch + /recall
 ├── specialist_runner.py   ← per-specialist runtime (one process per dispatched bot)
@@ -263,31 +280,17 @@ gstack-agentcall/
 │   ├── specialists.json   ← canonical: 18 specialists with id/name/role/voice/glyph/accent
 │   └── teams.json         ← canonical: 6 team presets
 ├── avatar-page/           ← bot's video feed (rendered by AgentCall's headless browser)
-│   ├── index.html
-│   ├── agentcall-audio.js
-│   └── avatars/ (symlink → ../avatars)
-├── avatars/
-│   ├── gen.py             ← regenerate all 18 SVGs from DiceBear API
-│   └── *.svg              ← per-specialist 3D-character avatars
+├── avatars/               ← per-specialist 3D-character SVGs
 ├── recap-page/            ← optional screenshare content
-├── scripts/
-│   ├── launch.sh          ← spawn an audio-mode bot
-│   ├── launch-visual.sh   ← spawn an avatar-mode bot
-│   └── kill-session.sh    ← graceful teardown
-├── vendor/
-│   ├── bridge.py          ← vendored AgentCall audio bridge (with patches)
-│   ├── bridge-visual.py   ← vendored AgentCall visual bridge (with patches)
-│   └── tunnel.py
-├── README.md              ← human-facing project README
-├── ARCHITECTURE.md        ← detailed system design
-├── CONTRIBUTING.md        ← how to add a specialist / mode
-├── SECURITY.md            ← OWASP/STRIDE audit (9 findings, all addressed)
-└── YC_APPLICATION.md      ← coding-agent transcript narrative for YC S26
+├── scripts/               ← launch / kill helpers
+├── vendor/                ← vendored AgentCall bridges (with patches)
+├── README.md, ARCHITECTURE.md, CONTRIBUTING.md, SECURITY.md
+└── YC_APPLICATION.md
 ```
 
 ---
 
-## Install (one-liner)
+## Install
 
 From inside Claude Code:
 
@@ -297,26 +300,25 @@ git clone --depth 1 https://github.com/anandpattern/gstack-agentcall.git \
   ~/gstack-agentcall/install
 ```
 
-The installer:
-1. Symlinks the repo into `~/.claude/skills/gstack-agentcall/`
-2. Verifies `~/.agentcall/config.json` exists (warns if missing)
-3. Smoke-tests `python3 -c "import server, specialist_runner"`
+The installer symlinks the repo into `~/.claude/skills/gstack-agentcall/`
+so SKILL.md is auto-discovered. Verify:
 
-Verify with `ls -la ~/.claude/skills/gstack-agentcall/SKILL.md`.
+```bash
+ls -la ~/.claude/skills/gstack-agentcall/SKILL.md
+```
 
 ---
 
 ## Safety + scope
 
-- The dashboard binds **127.0.0.1 only** — no remote access by design.
+- Dashboard binds **127.0.0.1 only** — no remote access by design.
 - CSRF guard on `/dispatch` and `/recall` blocks cross-origin POSTs.
-- `meetUrl` is allow-listed to Meet/Zoom/Teams/Webex hosts only.
-- Per-uid bus + log dirs at mode 0700 prevent same-host tampering.
+- `meetUrl` allow-listed to Meet/Zoom/Teams/Webex hosts only.
+- Per-uid bus + log dirs at mode 0700.
 - Subprocess env scrubbed to a 15-key allow-list — unrelated dev
   secrets do not reach vendored bridge code.
 
-See `SECURITY.md` for the full audit (9 findings, every one addressed
-or accepted with rationale).
+See `SECURITY.md` for the full audit (9 findings, all addressed).
 
 ---
 
