@@ -8,10 +8,6 @@ Built on top of [garrytan/gstack](https://github.com/garrytan/gstack) (the slash
 
 <sub>Dashboard at `localhost:8765` — paste a Meet URL, click cards or a team preset, hit Dispatch. Each card spins up a real participant with the avatar shown.</sub>
 
-![Avatars](docs/avatars.png)
-
-<sub>All 18 specialists ship with their own DiceBear `lorelei` character on a brand-accent disc. Each bot's "camera" tunnel renders the matching avatar live in the meeting.</sub>
-
 ---
 
 ## Why this exists
