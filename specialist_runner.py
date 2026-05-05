@@ -187,11 +187,6 @@ class Runner:
         Bridge is tailing this file via `tail -n 0 -f` inside launch.sh —
         the append is picked up immediately. Thread-safe because we open
         append-only and each write is one line.
-
-        Note: previously forced destination="meeting" in avatar mode but
-        that caused the AgentCall server to drop audio. Revert to the
-        default auto-routing — webpage path — which the user confirmed
-        used to work.
         """
         try:
             with open(self.cmds_path, "a", buffering=1) as fh:
@@ -199,6 +194,36 @@ class Runner:
             self.log(f"→ cmds: {cmd.get('command', '?')}")
         except Exception as e:
             self.log(f"cmd append failed: {e}")
+
+    def _tts_speak_cmd(self, text: str, voice: str | None = None,
+                       destination: str | None = None) -> dict:
+        """Build a tts.speak command, defaulting to destination='meeting' in avatar mode.
+
+        Why: the bridge's auto-routing tts.speak honors the call's mode.
+        For an avatar (webpage-av) call that means audio is sent ONLY to the
+        bot's webpage and never injected into the meeting. That path goes
+        through FirstCall's headless browser and has empirically been
+        unreliable — when used during this session it caused the AgentCall
+        WebSocket to drop without firing tts.done, so the user heard nothing.
+
+        Setting destination='meeting' makes the bridge use the explicit-routing
+        tts.generate API, which injects audio straight into the meeting room
+        and reliably fires tts.done. This matches the bridge's own design
+        comments at vendor/bridge-visual.py near the tts.speak handler.
+
+        An earlier revision of this file removed the default; that was a
+        misdiagnosis (tts drops were the *symptom*, not the *cause*).
+        """
+        cmd: dict = {
+            "command": "tts.speak",
+            "text": text,
+            "voice": voice or self.voice,
+        }
+        if destination is None and self.mode == "avatar":
+            destination = "meeting"
+        if destination:
+            cmd["destination"] = destination
+        return cmd
 
     # ── greeting ───────────────────────────────────────────────────────────
     def greeting_text(self) -> str:
@@ -222,7 +247,7 @@ class Runner:
         self.greeted = True
         text = self.greeting_text()
         self.log(f"greeting ({reason}): {text!r}")
-        self.send_cmd({"command": "tts.speak", "text": text, "voice": self.voice})
+        self.send_cmd(self._tts_speak_cmd(text))
 
     # ── bridge spawn via bash launcher ─────────────────────────────────────
     def start_bridge(self) -> None:
@@ -549,10 +574,15 @@ class Runner:
             if not text:
                 continue
             voice = msg.get("voice") or self.voice
+            # Honor an outbox-supplied destination (lets a brain force
+            # webpage-only audio for testing); otherwise _tts_speak_cmd
+            # picks the right default for the bridge mode.
+            destination = msg.get("destination")
             # Wait for the room to be quiet before speaking.
             self._acquire_speech_lock()
             self.log(f"← outbox: {text[:80]!r}")
-            self.send_cmd({"command": "tts.speak", "text": text, "voice": voice})
+            self.send_cmd(self._tts_speak_cmd(text, voice=voice,
+                                              destination=destination))
 
     # ── main ───────────────────────────────────────────────────────────────
     def install_signal_handlers(self) -> None:
