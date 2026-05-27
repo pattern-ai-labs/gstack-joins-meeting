@@ -232,5 +232,18 @@
     "glyph": "↻",
     "accent": "#c4b5fd",
     "category": "Ops"
+  },
+  {
+    "id": "spec",
+    "name": "Spec Partner",
+    "card_name": "Spec",
+    "role": "Spec Authoring Partner",
+    "description": "I turn vague intent into a precise, executable spec — five phases: why, scope, technical, draft, file.",
+    "desc_card": "Five-phase interrogation: vague intent → backlog-ready spec.",
+    "voice": "bf_isabella",
+    "icon": "§",
+    "glyph": "§",
+    "accent": "#a3e635",
+    "category": "Planning"
   }
 ]

@@ -194,12 +194,13 @@ curl -sX POST http://127.0.0.1:8765/dispatch \
       }))" "$MEET_URL" "$SPEC_IDS")"
 ```
 
-Specialist ids (single source of truth: `data/specialists.json`):
+Specialist ids (single source of truth: `data/specialists.json` —
+tracks upstream [gstack](https://github.com/garrytan/gstack) v1.47.0.0):
 `office-hours`, `plan-ceo-review`, `plan-eng-review`,
 `plan-design-review`, `plan-devex-review`, `design-consultation`,
 `design-shotgun`, `design-html`, `review`, `investigate`,
 `design-review`, `devex-review`, `qa`, `cso`, `ship`,
-`land-and-deploy`, `canary`, `retro`.
+`land-and-deploy`, `canary`, `retro`, `spec`.
 
 Team presets (`data/teams.json`):
 
@@ -207,7 +208,7 @@ Team presets (`data/teams.json`):
 |---|---|
 | `founding` | office-hours, plan-ceo-review, plan-eng-review |
 | `design` | plan-design-review, design-consultation, design-shotgun, design-html, design-review |
-| `build-review` | plan-eng-review, review, investigate |
+| `build-review` | spec, plan-eng-review, review, investigate |
 | `qa-ship` | qa, cso, ship, land-and-deploy, canary |
 | `dx` | plan-devex-review, devex-review |
 | `retro` | retro |

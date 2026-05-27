@@ -39,6 +39,7 @@ SPECIALISTS = [
     ("land-and-deploy",     "Deploy Engineer",   "⇧",   "22d3ee"),
     ("canary",              "SRE",               "☀",   "fbbf24"),
     ("retro",               "Retro Facilitator", "↻",   "c4b5fd"),
+    ("spec",                "Spec Partner",      "§",   "a3e635"),
 ]
 
 

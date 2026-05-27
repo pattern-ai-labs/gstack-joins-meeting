@@ -1,6 +1,6 @@
 # GStack × AgentCall
 
-Your engineering team, on the call. Every gstack specialist — CEO, CSO, QA, Eng Manager, Staff Engineer, SRE, and 12 others — joins your Google Meet as a real voice bot with its own 3D avatar.
+Your engineering team, on the call. Every gstack specialist — CEO, CSO, QA, Eng Manager, Staff Engineer, SRE, Spec Partner, and 12 others — joins your Google Meet as a real voice bot with its own 3D avatar.
 
 Built on top of [garrytan/gstack](https://github.com/garrytan/gstack) (the slash-command persona library) and [AgentCall](https://agentcall.dev) (the meeting-bot platform). Stdlib-only Python on the server, vanilla JS on the client, no framework, no build step.
 
@@ -22,7 +22,7 @@ It is a prototype. It works. It is also the smallest possible thing you can put 
 
 ## What it looks like
 
-- **Dashboard at `localhost:8765`** — a single page of 18 specialist cards plus six team presets (Founding Team, Design Team, Build & Review, etc.). Paste a Meet URL, click cards, hit **Dispatch selected**. Optional brief textarea (500-char cap) gets read into every bot's intro.
+- **Dashboard at `localhost:8765`** — a single page of 19 specialist cards plus six team presets (Founding Team, Design Team, Build & Review, etc.). Paste a Meet URL, click cards, hit **Dispatch selected**. Optional brief textarea (500-char cap) gets read into every bot's intro.
 - **In the meeting** — each dispatched specialist appears as a separate participant with a 3D-character avatar (DiceBear `lorelei` style, deterministic per id, accent-color background pulled from the dashboard card). They say hi, name their role, mention the brief if you set one, and stay live until you recall them.
 - **Voice loop** — the LISTENER specialist (the first one dispatched) forwards every transcript line to a shared intelligence-bus inbox; outbound replies dropped into the bus's outbox file get spoken back through that specialist's bridge. Cross-bot speech is gated by a single shared lock so two bots never talk over each other.
 - **Recall** — one button in the dashboard footer (or `POST /recall {"all": true}`) tears every bot down. SIGTERM goes out, `{"command":"leave"}` is appended to each bridge's command file, the runners exit cleanly within a couple of seconds.
@@ -163,8 +163,9 @@ Three things to know about the data flow:
 | `land-and-deploy`     | Deploy Engineer   | Deploy Engineer               | `bm_lewis`     |
 | `canary`              | SRE               | Site Reliability Engineer     | `am_adam`      |
 | `retro`               | Retro Facilitator | Retrospective Facilitator     | `bm_george`    |
+| `spec`                | Spec Partner      | Spec Authoring Partner        | `bf_isabella`  |
 
-Each id maps 1:1 to an upstream gstack slash command. The voice strings are AgentCall's voice catalog (Kokoro `am_*` / `af_*` / `bm_*` / `bf_*`).
+Each id maps 1:1 to an upstream [gstack](https://github.com/garrytan/gstack) slash command (tracked against v1.47.0.0). The voice strings are AgentCall's voice catalog (Kokoro `am_*` / `af_*` / `bm_*` / `bf_*`).
 
 ### Wiring a brain to the bus
 
@@ -188,7 +189,7 @@ The dashboard ships with six one-click team groupings:
 
 - **Founding Team** — `office-hours` + `plan-ceo-review` + `plan-eng-review`
 - **Design Team** — `plan-design-review` + `design-consultation` + `design-shotgun` + `design-html` + `design-review`
-- **Build & Review** — `plan-eng-review` + `review` + `investigate`
+- **Build & Review** — `spec` + `plan-eng-review` + `review` + `investigate`
 - **QA & Ship** — `qa` + `cso` + `ship` + `land-and-deploy` + `canary`
 - **DX Team** — `plan-devex-review` + `devex-review`
 - **Retro** — `retro`

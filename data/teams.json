@@ -18,7 +18,7 @@
   {
     "id": "build-review",
     "name": "Build & Review",
-    "specialists": ["plan-eng-review", "review", "investigate"]
+    "specialists": ["spec", "plan-eng-review", "review", "investigate"]
   },
   {
     "id": "qa-ship",

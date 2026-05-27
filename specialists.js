@@ -180,6 +180,16 @@ window.SPECIALISTS = [
     "glyph": "↻",
     "accent": "#c4b5fd",
     "category": "Ops"
+  },
+  {
+    "id": "spec",
+    "name": "Spec",
+    "role": "Spec Authoring Partner",
+    "desc": "Five-phase interrogation: vague intent → backlog-ready spec.",
+    "icon": "§",
+    "glyph": "§",
+    "accent": "#a3e635",
+    "category": "Planning"
   }
 ];
 window.TEAMS = [
@@ -207,6 +217,7 @@ window.TEAMS = [
     "id": "build-review",
     "name": "Build & Review",
     "specialists": [
+      "spec",
       "plan-eng-review",
       "review",
       "investigate"
