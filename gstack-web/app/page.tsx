@@ -1,5 +1,5 @@
 "use client";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton } from "@/lib/auth";
 import { useState } from "react";
 import { useApi, useApiSWR } from "@/lib/api";
 import type { Specialist, Worker, Assignment } from "@/lib/types";

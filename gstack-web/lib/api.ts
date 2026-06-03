@@ -1,5 +1,5 @@
 "use client";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/lib/auth";
 import useSWR, { type SWRResponse } from "swr";
 
 /** Fetch wrapper that attaches the Clerk session JWT to every request. */
@@ -29,5 +29,5 @@ export function useApi() {
 
 export function useApiSWR<T = unknown>(path: string | null): SWRResponse<T> {
   const call = useApi();
-  return useSWR<T>(path, async (p) => call<T>(p as string));
+  return useSWR<T>(path, async (p: string) => call<T>(p));
 }

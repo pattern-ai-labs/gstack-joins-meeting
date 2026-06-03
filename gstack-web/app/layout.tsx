@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { ClerkProvider, SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { Provider as AuthProvider, SignInButton, SignedIn, SignedOut, UserButton } from "@/lib/auth";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
+    <AuthProvider>
       <html lang="en">
         <body>
           <header className="border-b border-[var(--color-border)]">
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link href="/" className="muted hover:text-[var(--color-fg)]">Dashboard</Link>
                   <Link href="/workers" className="muted hover:text-[var(--color-fg)]">Workers</Link>
                   <Link href="/admin" className="muted hover:text-[var(--color-fg)]">Admin</Link>
-                  <UserButton afterSignOutUrl="/" />
+                  <UserButton />
                 </SignedIn>
                 <SignedOut>
                   <SignInButton mode="modal">
@@ -39,6 +39,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="max-w-5xl mx-auto px-6 py-8">{children}</main>
         </body>
       </html>
-    </ClerkProvider>
+    </AuthProvider>
   );
 }
