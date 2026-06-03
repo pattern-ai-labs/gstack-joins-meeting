@@ -197,30 +197,43 @@ class Runner:
 
     def _tts_speak_cmd(self, text: str, voice: str | None = None,
                        destination: str | None = None) -> dict:
-        """Build a tts.speak command, defaulting to destination='meeting' in avatar mode.
+        """Build a tts.speak command. Avatar mode no longer adds
+        destination='meeting' by default — see below.
 
-        Why: the bridge's auto-routing tts.speak honors the call's mode.
-        For an avatar (webpage-av) call that means audio is sent ONLY to the
-        bot's webpage and never injected into the meeting. That path goes
-        through FirstCall's headless browser and has empirically been
-        unreliable — when used during this session it caused the AgentCall
-        WebSocket to drop without firing tts.done, so the user heard nothing.
+        History (kept because we've flipped this twice and need to stop):
 
-        Setting destination='meeting' makes the bridge use the explicit-routing
-        tts.generate API, which injects audio straight into the meeting room
-        and reliably fires tts.done. This matches the bridge's own design
-        comments at vendor/bridge-visual.py near the tts.speak handler.
+          v1 — no default. Bridge auto-routes to webpage. Webpage's
+                 AudioContext starts SUSPENDED in AgentCall's headless
+                 Chrome (no user gesture). Audio queued but never plays.
+                 USER HEARS NOTHING.
+          v2 — default destination='meeting' to force the bridge to use
+                 tts.generate with destination=meeting (skip webpage
+                 entirely, inject audio straight into the meeting bus).
+                 Worked at the time.
+          v3 — CURRENT. avatar-page/agentcall-audio.js + index.html now
+                 call ctx.resume() on load (the primeAudio IIFE), so the
+                 webpage audio context is no longer suspended. With that
+                 patch the plain webpage path WORKS. Meanwhile AgentCall
+                 silently broke destination=meeting: tts.done fires but
+                 no audio reaches the meeting (verified live across
+                 multiple calls — every single message was inaudible
+                 until we bypassed via plain tts.speak).
 
-        An earlier revision of this file removed the default; that was a
-        misdiagnosis (tts drops were the *symptom*, not the *cause*).
+        So the audio-context resume patch + plain tts.speak is the
+        reliable combination. Do NOT re-add the destination=meeting
+        default unless you've verified BOTH that the resume patch is
+        broken AND that AgentCall's destination=meeting routing is
+        actually delivering audio again.
+
+        Per-message overrides are still honored — a brain or test can
+        pass destination='meeting' explicitly via the outbox if it ever
+        becomes useful again.
         """
         cmd: dict = {
             "command": "tts.speak",
             "text": text,
             "voice": voice or self.voice,
         }
-        if destination is None and self.mode == "avatar":
-            destination = "meeting"
         if destination:
             cmd["destination"] = destination
         return cmd
