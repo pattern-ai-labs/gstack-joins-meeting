@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Provider as AuthProvider } from "@/lib/auth";
 import { ToastProvider } from "@/lib/toast";
-import { Sidebar } from "@/components/Sidebar";
+import { Shell } from "@/components/Shell";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -17,8 +17,19 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "gstack — bring your engineering team into the meeting",
-  description: "Drop any gstack specialist into your Google Meet as a voice bot with its own avatar. Powered by your Claude Code session.",
+  title: "gstack joins your meeting — voice agents for every gstack specialist",
+  description: "Bring CEO, CSO, QA Lead, Senior Designer, and 15 more gstack specialists into your Google Meet as real voice bots with their own 3D avatars. Open source, MIT, free forever.",
+  openGraph: {
+    title: "gstack joins your meeting",
+    description: "Every gstack specialist as a real voice bot in your Google Meet. Built on Garry Tan's open-source personas.",
+    url: "https://gstack-joins-meeting.vercel.app",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "gstack joins your meeting",
+    description: "Every gstack specialist as a real voice bot in your Meet.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -27,10 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" className={`${inter.variable} ${jetbrains.variable}`}>
         <body>
           <ToastProvider>
-            <div className="flex min-h-screen">
-              <Sidebar />
-              <div className="flex-1 min-w-0">{children}</div>
-            </div>
+            <Shell>{children}</Shell>
           </ToastProvider>
         </body>
       </html>
