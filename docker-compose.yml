@@ -1,0 +1,53 @@
+# Local smoke test of the Phase-1 hosted topology.
+#
+#   docker compose up broker          # broker only — visit http://localhost:8787
+#   docker compose run --rm mint      # mint a worker key
+#   GW=gw_... docker compose up worker
+#
+# The worker container runs server.py + worker.py together so the
+# dispatch loop is end-to-end testable without a real Meet URL (the
+# dispatch will hit /dispatch and fail with `invalid meetUrl` until
+# you paste a real one in the broker's web form). That failure is the
+# "the pipe is wired" confirmation.
+
+services:
+  broker:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: >
+      sh -c "pip install --quiet aiohttp websockets &&
+             python3 broker/main.py --host 0.0.0.0 --port 8787"
+    environment:
+      GSTACK_ADMIN_TOKEN: ${GSTACK_ADMIN_TOKEN:-dev-admin-token-replace-me}
+      GSTACK_BROKER_STATE: /app/.broker-state.json
+      # GSTACK_POOL_AGENTCALL_KEY: ak_ac_...   # uncomment for real dispatches
+    ports:
+      - "8787:8787"
+
+  mint:
+    image: curlimages/curl:8.10.1
+    depends_on: [broker]
+    command: >
+      sh -c "sleep 1 &&
+             curl -sX POST http://broker:8787/api/admin/mint
+             -H 'Authorization: Bearer ${GSTACK_ADMIN_TOKEN:-dev-admin-token-replace-me}'
+             -H 'content-type: application/json'
+             -d '{\"label\":\"compose-worker\"}'"
+
+  worker:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    depends_on: [broker]
+    command: >
+      sh -c "pip install --quiet aiohttp websockets &&
+             python3 worker.py
+             --broker ws://broker:8787/v1/workers/connect
+             --key $${GW}
+             --name compose-worker"
+    environment:
+      GW: ${GW:-}
+      AGENTCALL_API_KEY: ${AGENTCALL_API_KEY:-}
