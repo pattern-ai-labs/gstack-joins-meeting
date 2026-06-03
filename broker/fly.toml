@@ -1,0 +1,41 @@
+# Fly.io deploy config for the gstack broker.
+#
+# Setup:
+#   fly launch --no-deploy --name gstack-broker
+#   fly postgres create --name gstack-db          # or attach Supabase via secret
+#   fly postgres attach --app gstack-broker gstack-db
+#   fly secrets set \
+#     CLERK_JWKS_URL="https://<your>.clerk.accounts.dev/.well-known/jwks.json" \
+#     CLERK_ISSUER="https://<your>.clerk.accounts.dev" \
+#     GSTACK_POOL_AGENTCALL_KEY="ak_ac_..."
+#   fly deploy
+
+app           = "gstack-broker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PYTHONUNBUFFERED = "1"
+
+[http_service]
+  internal_port      = 8787
+  force_https        = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes          = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval     = "30s"
+    method       = "get"
+    timeout      = "5s"
+    path         = "/api/me"
+    # /api/me returns 401 unauthenticated — that's healthy; we just want a 4xx not 5xx.
+
+[[vm]]
+  cpu_kind  = "shared"
+  cpus      = 1
+  memory_mb = 512

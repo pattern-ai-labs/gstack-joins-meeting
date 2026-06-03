@@ -1,47 +1,56 @@
-# Local smoke test of the Phase-1 hosted topology.
+# Local end-to-end stack for Phase-2 hosted gstack.
 #
-#   docker compose up broker          # broker only — visit http://localhost:8787
-#   docker compose run --rm mint      # mint a worker key
+#   docker compose up postgres broker            # backend
+#   cd gstack-web && npm install && npm run dev  # frontend (separate terminal)
+#
+# Bring a worker in (requires a gw_ key minted via the web UI or REST):
 #   GW=gw_... docker compose up worker
 #
-# The worker container runs server.py + worker.py together so the
-# dispatch loop is end-to-end testable without a real Meet URL (the
-# dispatch will hit /dispatch and fail with `invalid meetUrl` until
-# you paste a real one in the broker's web form). That failure is the
-# "the pipe is wired" confirmation.
+# Production deploy is: broker → Fly.io, postgres → Fly Postgres or Supabase,
+# frontend → Vercel. See broker/fly.toml and gstack-web/README.md.
 
 services:
-  broker:
-    image: python:3.12-slim
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: >
-      sh -c "pip install --quiet aiohttp websockets &&
-             python3 broker/main.py --host 0.0.0.0 --port 8787"
+  postgres:
+    image: postgres:16-alpine
     environment:
-      GSTACK_ADMIN_TOKEN: ${GSTACK_ADMIN_TOKEN:-dev-admin-token-replace-me}
-      GSTACK_BROKER_STATE: /app/.broker-state.json
-      # GSTACK_POOL_AGENTCALL_KEY: ak_ac_...   # uncomment for real dispatches
+      POSTGRES_USER:     gstack
+      POSTGRES_PASSWORD: gstack
+      POSTGRES_DB:       gstack
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gstack"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  broker:
+    build:
+      context: .
+      dockerfile: broker/Dockerfile
+    environment:
+      DATABASE_URL:                postgresql://gstack:gstack@postgres:5432/gstack
+      # Leave CLERK_JWKS_URL unset to use the dev-fallback (X-Dev-User-Id).
+      # Set it to enable real auth even in compose.
+      # CLERK_JWKS_URL:            https://<your>.clerk.accounts.dev/.well-known/jwks.json
+      # CLERK_ISSUER:              https://<your>.clerk.accounts.dev
+      GSTACK_POOL_AGENTCALL_KEY:   ${AGENTCALL_API_KEY:-}
+      PYTHONUNBUFFERED:            "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8787:8787"
-
-  mint:
-    image: curlimages/curl:8.10.1
-    depends_on: [broker]
-    command: >
-      sh -c "sleep 1 &&
-             curl -sX POST http://broker:8787/api/admin/mint
-             -H 'Authorization: Bearer ${GSTACK_ADMIN_TOKEN:-dev-admin-token-replace-me}'
-             -H 'content-type: application/json'
-             -d '{\"label\":\"compose-worker\"}'"
 
   worker:
     image: python:3.12-slim
     working_dir: /app
     volumes:
       - .:/app
-    depends_on: [broker]
+    depends_on:
+      - broker
     command: >
       sh -c "pip install --quiet aiohttp websockets &&
              python3 worker.py
@@ -51,3 +60,6 @@ services:
     environment:
       GW: ${GW:-}
       AGENTCALL_API_KEY: ${AGENTCALL_API_KEY:-}
+
+volumes:
+  pgdata:

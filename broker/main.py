@@ -1,33 +1,39 @@
 #!/usr/bin/env python3
-"""gstack broker — Phase-1 minimal hosted dispatcher.
+"""gstack broker — Phase-2 hosted dispatcher.
 
-Two surfaces:
+Backed by Postgres (psycopg3) and Clerk JWT auth. Replaces the Phase-1
+JSON store. Workers still authenticate with their long-lived `gw_xxx`
+key; end-users authenticate with their Clerk session JWT.
 
-  HTTP  GET  /                       → tiny HTML form (paste Meet URL, pick specialists)
-  HTTP  GET  /api/workers            → list of currently-connected workers
-  HTTP  POST /api/dispatch           → assign a job to an idle worker
-  HTTP  POST /api/recall             → recall all specialists on a worker
-  HTTP  POST /api/admin/mint         → mint a new worker key (bearer-auth)
-  HTTP  POST /api/admin/revoke       → revoke a worker key (bearer-auth)
-  HTTP  GET  /api/admin/keys         → list all worker keys (bearer-auth)
+Surface:
+
+  HTTP  GET  /                       → SPA shell (gstack-web is the real frontend)
+  HTTP  GET  /api/me                 → who am I + my user row + my workers
+  HTTP  GET  /api/workers            → my online workers (admin: all)
+  HTTP  POST /api/dispatch           → assign job to one of MY idle workers
+  HTTP  POST /api/recall             → recall my (or specific) worker
+  HTTP  GET  /api/assignments        → my dispatch history (admin: all)
+  HTTP  POST /api/worker-keys        → mint a key OWNED BY ME (label in body)
+  HTTP  GET  /api/worker-keys        → list keys OWNED BY ME (admin: all)
+  HTTP  POST /api/worker-keys/revoke → revoke one of my keys (admin: any)
+  HTTP  GET  /api/specialists        → my customised specialist list
+  HTTP  PUT  /api/specialists/:id    → override description / voice / name
+  HTTP  GET  /api/admin/users        → all users (admin only)
+  HTTP  POST /api/admin/users/:id    → set user role (admin only)
   WS    /v1/workers/connect?key=gw_  → workers connect here
 
-Persistence: a single JSON file at $GSTACK_BROKER_STATE
-  (default: /tmp/gstack-broker-state.json). Replaced by Postgres in Phase 2.
+Env:
+  DATABASE_URL                 postgresql://gstack:gstack@host/gstack
+  CLERK_JWKS_URL               https://<instance>.clerk.accounts.dev/.well-known/jwks.json
+  CLERK_ISSUER                 https://<instance>.clerk.accounts.dev
+  GSTACK_POOL_AGENTCALL_KEY    centrally-funded AgentCall key (free tier pool)
 
-Auth model (Phase 1):
-  - workers authenticate with a long-lived `gw_xxx` key
-  - admin endpoints authenticate with `Authorization: Bearer $GSTACK_ADMIN_TOKEN`
-  - end-user /api/dispatch is OPEN in Phase 1 — Phase 2 wraps with Clerk
+If CLERK_JWKS_URL is unset the broker uses a dev fallback that reads
+X-Dev-User-Id from the request. Useful for local docker-compose runs.
 
 Run:
-  pip install aiohttp websockets
-  export GSTACK_ADMIN_TOKEN="$(openssl rand -hex 24)"
+  pip install aiohttp websockets psycopg[binary] psycopg_pool PyJWT cryptography
   python3 broker/main.py --port 8787
-
-Then on a worker:
-  GSTACK_WORKER_KEY=gw_xxx GSTACK_BROKER_URL=ws://127.0.0.1:8787/v1/workers/connect \
-    python3 worker.py
 """
 from __future__ import annotations
 
@@ -38,47 +44,32 @@ import json
 import os
 import secrets
 import time
-from pathlib import Path
 from typing import Optional
 
 from aiohttp import web, WSMsgType
 
+# Support both `python -m broker.main` and `python broker/main.py`.
+try:
+    from . import db, auth                       # type: ignore
+except ImportError:
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    import db, auth                              # type: ignore
 
-STATE_PATH = Path(os.environ.get("GSTACK_BROKER_STATE", "/tmp/gstack-broker-state.json"))
-ADMIN_TOKEN = os.environ.get("GSTACK_ADMIN_TOKEN", "")
+
 TRANSIENT_AGENTCALL_KEY = os.environ.get("GSTACK_POOL_AGENTCALL_KEY", "")
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# state — Phase 1: a single JSON file
-
-def _load_state() -> dict:
-    if STATE_PATH.is_file():
-        try:
-            return json.loads(STATE_PATH.read_text())
-        except Exception:
-            pass
-    return {"keys": {}}  # {key_hash: {label, created_at, last_seen, revoked}}
-
-
-def _save_state(state: dict) -> None:
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STATE_PATH.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, indent=2))
-    os.replace(tmp, STATE_PATH)
-
-
-def _hash_key(key: str) -> str:
-    return hashlib.sha256(key.encode("utf-8")).hexdigest()
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# in-memory worker registry (the WS connections themselves)
+# in-memory worker registry (live WS connections)
 
 class Worker:
-    def __init__(self, ws: web.WebSocketResponse, key_hash: str) -> None:
+    def __init__(self, ws: web.WebSocketResponse, key_hash: str,
+                 owner_user_id: str) -> None:
         self.ws = ws
         self.key_hash = key_hash
+        self.owner_user_id = owner_user_id
         self.id = secrets.token_hex(6)
         self.name = "unnamed"
         self.platform = ""
@@ -90,6 +81,7 @@ class Worker:
     def to_json(self) -> dict:
         return {
             "id":                  self.id,
+            "owner_user_id":       self.owner_user_id,
             "name":                self.name,
             "platform":            self.platform,
             "state":               self.state,
@@ -99,96 +91,59 @@ class Worker:
         }
 
 
-WORKERS: dict[str, Worker] = {}  # id → Worker
+WORKERS: dict[str, Worker] = {}
 
 
-def pick_idle_worker() -> Optional[Worker]:
-    # Round-robin would be nicer; for Phase 1 take the oldest-idle.
-    idle = [w for w in WORKERS.values() if w.state == "idle"]
-    if not idle:
+def _hash_key(key: str) -> str:
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def pick_idle_worker_for(user_id: str, is_admin: bool) -> Optional[Worker]:
+    """Pick an idle worker the user owns. Admins can use any idle worker
+    (the implicit pool)."""
+    pool = [w for w in WORKERS.values() if w.state == "idle"
+            and (is_admin or w.owner_user_id == user_id)]
+    if not pool:
         return None
-    idle.sort(key=lambda w: w.last_assignment_at or 0)
-    return idle[0]
+    pool.sort(key=lambda w: w.last_assignment_at or 0)
+    return pool[0]
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# auth helpers
+# helper: ensure the user row exists for whoever's making this request
 
-def _require_admin(req: web.Request) -> Optional[web.Response]:
-    if not ADMIN_TOKEN:
-        return web.json_response(
-            {"error": "GSTACK_ADMIN_TOKEN not set on the broker"}, status=500)
-    auth = req.headers.get("authorization", "")
-    if auth != f"Bearer {ADMIN_TOKEN}":
-        return web.json_response({"error": "unauthorized"}, status=401)
-    return None
+async def _ensure_user(req: web.Request) -> Optional[dict]:
+    ident = req.get("user")
+    if not ident or not ident.get("user_id"):
+        return None
+    return await db.upsert_user(ident["user_id"], ident.get("email"), ident.get("name"))
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # HTTP routes
 
-INDEX_HTML = """<!doctype html>
-<html><head><meta charset="utf-8"><title>gstack broker</title>
-<style>
-  body { font: 14px/1.45 ui-monospace, monospace; background: #0a0a0b; color: #e6e6e6; padding: 32px; max-width: 760px; margin: auto; }
-  h1 { font-size: 18px; margin: 0 0 16px; color: #a3e635; }
-  input, textarea, select { width: 100%; box-sizing: border-box; padding: 10px 12px; background: #16161a; color: #e6e6e6; border: 1px solid #2a2a2e; border-radius: 6px; font: inherit; margin: 4px 0 12px; }
-  button { padding: 10px 16px; background: #a3e635; color: #0a0a0b; border: 0; border-radius: 6px; font-weight: 600; cursor: pointer; }
-  pre { background: #16161a; border: 1px solid #2a2a2e; border-radius: 6px; padding: 12px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; }
-  .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
-  .row label { white-space: nowrap; }
-  .muted { color: #7a7a82; font-size: 12px; }
-</style></head><body>
-<h1>gstack broker — Phase 1</h1>
-<p class="muted">Paste a Meet URL. Pick specialists (comma-separated ids). Click Dispatch — the broker hands the job to the next idle worker.</p>
-<form id="f">
-  <label>Meet URL <input name="meetUrl" placeholder="https://meet.google.com/abc-defg-hij" required></label>
-  <label>Specialists <input name="specialists" placeholder="plan-ceo-review,cso" value="plan-ceo-review"></label>
-  <label>Brief (optional) <textarea name="brief" rows="2" placeholder="Pitch we're discussing today..."></textarea></label>
-  <div class="row">
-    <label>Mode <select name="mode"><option value="avatar">avatar</option><option value="audio">audio</option></select></label>
-    <button type="submit">Dispatch</button>
-  </div>
-</form>
-<h2 style="font-size:14px;margin-top:24px">Workers</h2>
-<pre id="workers">loading…</pre>
-<h2 style="font-size:14px;margin-top:24px">Last response</h2>
-<pre id="out">—</pre>
-<script>
-async function loadWorkers() {
-  const r = await fetch('/api/workers');
-  document.getElementById('workers').textContent = JSON.stringify(await r.json(), null, 2);
-}
-loadWorkers(); setInterval(loadWorkers, 3000);
-document.getElementById('f').onsubmit = async (ev) => {
-  ev.preventDefault();
-  const fd = new FormData(ev.target);
-  const body = {
-    meetUrl: fd.get('meetUrl'),
-    specialists: fd.get('specialists').split(',').map(s => s.trim()).filter(Boolean),
-    brief: fd.get('brief'),
-    mode: fd.get('mode'),
-  };
-  const r = await fetch('/api/dispatch', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body)});
-  document.getElementById('out').textContent = JSON.stringify(await r.json(), null, 2);
-};
-</script></body></html>
-"""
-
-
-async def index(req: web.Request) -> web.Response:
-    return web.Response(text=INDEX_HTML, content_type="text/html")
+async def me(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    mine = [w.to_json() for w in WORKERS.values() if w.owner_user_id == user_row["id"]]
+    return web.json_response({"user": _user_safe(user_row), "online_workers": mine})
 
 
 async def list_workers(req: web.Request) -> web.Response:
-    return web.json_response({
-        "workers": [w.to_json() for w in WORKERS.values()],
-        "idle":    sum(1 for w in WORKERS.values() if w.state == "idle"),
-        "busy":    sum(1 for w in WORKERS.values() if w.state == "busy"),
-    })
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    is_admin = user_row["role"] == "admin"
+    workers = [w.to_json() for w in WORKERS.values()
+               if is_admin or w.owner_user_id == user_row["id"]]
+    return web.json_response({"workers": workers})
 
 
 async def dispatch(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         body = await req.json()
     except Exception:
@@ -199,11 +154,20 @@ async def dispatch(req: web.Request) -> web.Response:
     if not meet_url or not specs:
         return web.json_response({"error": "meetUrl and specialists[] required"}, status=400)
 
-    worker = pick_idle_worker()
-    if worker is None:
-        return web.json_response({"error": "no idle workers"}, status=503)
+    # Quota check.
+    if user_row["minutes_used"] >= user_row["quota_minutes"]:
+        return web.json_response({"error": "quota exhausted",
+                                  "minutes_used": user_row["minutes_used"],
+                                  "quota_minutes": user_row["quota_minutes"]}, status=429)
 
-    aid = f"a-{int(time.time()*1000)}"
+    is_admin = user_row["role"] == "admin"
+    worker = pick_idle_worker_for(user_row["id"], is_admin)
+    if worker is None:
+        return web.json_response({"error": "no idle worker for this account",
+                                  "hint": "start a worker.py with one of your gw_ keys"},
+                                 status=503)
+
+    aid = f"a-{int(time.time()*1000)}-{secrets.token_hex(3)}"
     msg = {
         "type":              "assignment",
         "id":                aid,
@@ -211,7 +175,7 @@ async def dispatch(req: web.Request) -> web.Response:
         "specialists":       specs,
         "brief":             body.get("brief", ""),
         "mode":              body.get("mode", "avatar"),
-        "agentcall_api_key": TRANSIENT_AGENTCALL_KEY,  # Phase 1: shared pool
+        "agentcall_api_key": TRANSIENT_AGENTCALL_KEY,
         "end_at":            time.time() + (int(body.get("max_duration_min", 30)) * 60),
     }
     try:
@@ -219,21 +183,34 @@ async def dispatch(req: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"error": f"worker send failed: {e}"}, status=502)
 
-    # Optimistic state update — the worker will confirm with its own state message.
     worker.state = "busy"
     worker.last_assignment_id = aid
     worker.last_assignment_at = time.time()
+
+    await db.insert_assignment(
+        aid, user_row["id"], worker.id, worker.key_hash,
+        meet_url, specs, body.get("brief", ""), body.get("mode", "avatar"),
+    )
+    await db.audit(user_row["id"], "dispatch",
+                   {"assignment_id": aid, "worker_id": worker.id, "meet_url": meet_url})
+
     return web.json_response({"ok": True, "assignment_id": aid, "worker_id": worker.id})
 
 
 async def recall(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         body = await req.json()
     except Exception:
         body = {}
+    is_admin = user_row["role"] == "admin"
     target_worker = body.get("worker_id")
     targets = [w for w in WORKERS.values()
-               if (not target_worker or w.id == target_worker) and w.state == "busy"]
+               if w.state == "busy"
+               and (is_admin or w.owner_user_id == user_row["id"])
+               and (not target_worker or w.id == target_worker)]
     if not targets:
         return web.json_response({"ok": True, "recalled": 0})
     msg = json.dumps({"type": "recall", "id": body.get("assignment_id", "*")})
@@ -244,48 +221,61 @@ async def recall(req: web.Request) -> web.Response:
             sent += 1
         except Exception:
             pass
+    await db.audit(user_row["id"], "recall", {"count": sent})
     return web.json_response({"ok": True, "recalled": sent})
 
 
-async def admin_mint(req: web.Request) -> web.Response:
-    if err := _require_admin(req):
-        return err
+async def list_assignments(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    is_admin = user_row["role"] == "admin"
+    rows = await db.list_assignments(user_id=None if is_admin else user_row["id"], limit=100)
+    return web.json_response({"assignments": [_assignment_safe(r) for r in rows]})
+
+
+async def mint_worker_key(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         body = await req.json()
     except Exception:
         body = {}
     label = (body.get("label") or "unnamed").strip()[:80]
     plaintext = "gw_" + secrets.token_urlsafe(24)
-    state = _load_state()
-    state["keys"][_hash_key(plaintext)] = {
-        "label":      label,
-        "created_at": time.time(),
-        "last_seen":  None,
-        "revoked":    False,
-    }
-    _save_state(state)
-    # The plaintext is shown ONCE — admin must copy it now.
+    await db.insert_worker_key(_hash_key(plaintext), user_row["id"], label)
+    await db.audit(user_row["id"], "worker_key.mint", {"label": label})
     return web.json_response({"worker_key": plaintext, "label": label})
 
 
-async def admin_revoke(req: web.Request) -> web.Response:
-    if err := _require_admin(req):
-        return err
+async def list_my_worker_keys(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    is_admin = user_row["role"] == "admin"
+    rows = await db.list_worker_keys(owner_user_id=None if is_admin else user_row["id"])
+    return web.json_response({"keys": [_key_safe(r) for r in rows]})
+
+
+async def revoke_my_worker_key(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         body = await req.json()
     except Exception:
         body = {}
-    hash_or_plain = body.get("key") or ""
-    if hash_or_plain.startswith("gw_"):
-        h = _hash_key(hash_or_plain)
-    else:
-        h = hash_or_plain
-    state = _load_state()
-    if h not in state["keys"]:
+    raw = body.get("key") or body.get("key_hash") or ""
+    h = _hash_key(raw) if raw.startswith("gw_") else raw
+    row = await db.get_worker_key(h)
+    if not row:
         return web.json_response({"error": "unknown key"}, status=404)
-    state["keys"][h]["revoked"] = True
-    _save_state(state)
-    # Boot any currently-connected worker using this key.
+    is_admin = user_row["role"] == "admin"
+    if not is_admin and row["owner_user_id"] != user_row["id"]:
+        return web.json_response({"error": "forbidden"}, status=403)
+    await db.revoke_worker_key(h)
+    # Boot any live worker using this key.
     booted = 0
     for w in list(WORKERS.values()):
         if w.key_hash == h:
@@ -294,51 +284,92 @@ async def admin_revoke(req: web.Request) -> web.Response:
                 booted += 1
             except Exception:
                 pass
-    return web.json_response({"ok": True, "revoked": True, "booted": booted})
+    await db.audit(user_row["id"], "worker_key.revoke", {"key_hash": h[:12], "booted": booted})
+    return web.json_response({"ok": True, "booted": booted})
 
 
-async def admin_keys(req: web.Request) -> web.Response:
-    if err := _require_admin(req):
-        return err
-    state = _load_state()
-    out = []
-    for h, meta in state["keys"].items():
-        out.append({
-            "key_hash":   h[:12] + "...",
-            "label":      meta.get("label"),
-            "created_at": meta.get("created_at"),
-            "last_seen":  meta.get("last_seen"),
-            "revoked":    meta.get("revoked", False),
-            "online":     any(w.key_hash == h for w in WORKERS.values()),
-        })
-    return web.json_response({"keys": out})
+async def get_specialists(req: web.Request) -> web.Response:
+    """Return the canonical specialist list with the caller's overrides applied."""
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    base = _load_specialists_data()
+    overrides = await db.get_overrides(user_row["id"])
+    merged = []
+    for spec in base:
+        ov = overrides.get(spec["id"], {})
+        merged.append({**spec, **ov, "id": spec["id"]})
+    return web.json_response({"specialists": merged})
+
+
+async def put_specialist_override(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    sid = req.match_info["sid"]
+    base_ids = {s["id"] for s in _load_specialists_data()}
+    if sid not in base_ids:
+        return web.json_response({"error": "unknown specialist"}, status=404)
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    await db.upsert_override(
+        user_row["id"], sid,
+        description=body.get("description"),
+        voice=body.get("voice"),
+        name=body.get("name"),
+    )
+    return web.json_response({"ok": True})
+
+
+async def admin_users(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None or user_row["role"] != "admin":
+        return web.json_response({"error": "forbidden"}, status=403)
+    users = await db.list_users()
+    return web.json_response({"users": [_user_safe(u) for u in users]})
+
+
+async def admin_set_role(req: web.Request) -> web.Response:
+    user_row = await _ensure_user(req)
+    if user_row is None or user_row["role"] != "admin":
+        return web.json_response({"error": "forbidden"}, status=403)
+    target = req.match_info["uid"]
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    role = body.get("role", "")
+    if role not in ("admin", "member"):
+        return web.json_response({"error": "bad role"}, status=400)
+    await db.set_user_role(target, role)
+    await db.audit(user_row["id"], "user.set_role", {"target": target, "role": role})
+    return web.json_response({"ok": True})
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# WS endpoint — workers connect here
+# WS endpoint for workers
 
 async def worker_ws(req: web.Request) -> web.WebSocketResponse:
     key = req.query.get("key", "")
     if not key.startswith("gw_"):
         return web.json_response({"error": "bad key format"}, status=400)
 
-    state = _load_state()
     h = _hash_key(key)
-    meta = state["keys"].get(h)
-    if not meta or meta.get("revoked"):
+    row = await db.get_worker_key(h)
+    if not row or row["revoked"]:
         return web.json_response({"error": "unknown or revoked key"}, status=401)
+    owner = row["owner_user_id"]
+    await db.touch_worker_key(h)
 
     ws = web.WebSocketResponse(heartbeat=25)
     await ws.prepare(req)
 
-    worker = Worker(ws, h)
+    worker = Worker(ws, h, owner)
     WORKERS[worker.id] = worker
     await ws.send_str(json.dumps({"type": "hello", "worker_id": worker.id}))
-
-    # Update last_seen.
-    meta["last_seen"] = time.time()
-    state["keys"][h] = meta
-    _save_state(state)
+    await db.audit(owner, "worker.connected", {"worker_id": worker.id, "label": row["label"]})
 
     try:
         async for msg in ws:
@@ -352,10 +383,16 @@ async def worker_ws(req: web.Request) -> web.WebSocketResponse:
                     worker.name = (obj.get("name") or "")[:80]
                     worker.platform = (obj.get("platform") or "")[:80]
                 elif t == "state":
-                    worker.state = obj.get("state", "idle")
+                    new_state = obj.get("state", "idle")
+                    if new_state == "idle" and worker.state == "busy" and worker.last_assignment_id:
+                        await db.update_assignment_status(worker.last_assignment_id, "ended",
+                                                          obj.get("detail"))
+                    worker.state = new_state
                 elif t == "status":
-                    # Forward to anyone listening; Phase-1 just logs.
-                    print(f"[worker {worker.id}] status: {obj}", flush=True)
+                    aid = obj.get("id")
+                    event = obj.get("event")
+                    if aid and event in ("started", "ended", "failed", "rejected"):
+                        await db.update_assignment_status(aid, event, obj.get("detail"))
                 elif t == "pong":
                     pass
                 else:
@@ -364,33 +401,134 @@ async def worker_ws(req: web.Request) -> web.WebSocketResponse:
                 break
     finally:
         WORKERS.pop(worker.id, None)
+        await db.audit(owner, "worker.disconnected", {"worker_id": worker.id})
     return ws
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# tiny helpers / serialisers
+
+def _user_safe(row: dict) -> dict:
+    return {
+        "id":            row["id"],
+        "email":         row.get("email"),
+        "display_name":  row.get("display_name"),
+        "role":          row["role"],
+        "plan":          row["plan"],
+        "quota_minutes": row["quota_minutes"],
+        "minutes_used":  row["minutes_used"],
+    }
+
+
+def _key_safe(row: dict) -> dict:
+    return {
+        "key_hash_prefix": row["key_hash"][:12] + "…",
+        "owner_user_id":   row["owner_user_id"],
+        "label":           row["label"],
+        "created_at":      row["created_at"].isoformat() if row.get("created_at") else None,
+        "last_seen_at":    row["last_seen_at"].isoformat() if row.get("last_seen_at") else None,
+        "revoked":         row["revoked"],
+    }
+
+
+def _assignment_safe(row: dict) -> dict:
+    return {
+        "id":               row["id"],
+        "user_id":          row["user_id"],
+        "worker_id":        row["worker_id"],
+        "meet_url":         row["meet_url"],
+        "specialists":      row["specialists"],
+        "brief":            row.get("brief"),
+        "mode":             row["mode"],
+        "status":           row["status"],
+        "detail":           row.get("detail"),
+        "created_at":       row["created_at"].isoformat() if row.get("created_at") else None,
+        "started_at":       row["started_at"].isoformat() if row.get("started_at") else None,
+        "ended_at":         row["ended_at"].isoformat() if row.get("ended_at") else None,
+        "billable_seconds": row.get("billable_seconds"),
+    }
+
+
+_SPECIALISTS_CACHE: list[dict] = []
+def _load_specialists_data() -> list[dict]:
+    """Load data/specialists.json once and cache for the process lifetime."""
+    global _SPECIALISTS_CACHE
+    if _SPECIALISTS_CACHE:
+        return _SPECIALISTS_CACHE
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(repo_root, "data", "specialists.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            _SPECIALISTS_CACHE = json.load(f)
+    except Exception:
+        _SPECIALISTS_CACHE = []
+    return _SPECIALISTS_CACHE
+
+
+# ──────────────────────────────────────────────────────────────────────────
+
+async def on_startup(app: web.Application) -> None:
+    await db.run_migrations()
+    print("[broker] db ready", flush=True)
+
+
+async def on_cleanup(app: web.Application) -> None:
+    await db.close_pool()
+
+
+@web.middleware
+async def cors_middleware(req: web.Request, handler):
+    if req.method == "OPTIONS":
+        return _cors_preflight(req)
+    resp = await handler(req)
+    _add_cors(resp, req)
+    return resp
+
+
+def _add_cors(resp: web.StreamResponse, req: web.Request) -> None:
+    origin = req.headers.get("origin", "*")
+    resp.headers["Access-Control-Allow-Origin"]      = origin
+    resp.headers["Access-Control-Allow-Credentials"] = "true"
+    resp.headers["Access-Control-Allow-Headers"]     = "authorization, content-type, x-dev-user-id"
+    resp.headers["Access-Control-Allow-Methods"]     = "GET, POST, PUT, DELETE, OPTIONS"
+
+
+def _cors_preflight(req: web.Request) -> web.Response:
+    resp = web.Response(status=204)
+    _add_cors(resp, req)
+    return resp
+
 
 def build_app() -> web.Application:
-    app = web.Application()
-    app.router.add_get("/", index)
+    app = web.Application(middlewares=[cors_middleware, auth.auth_middleware])
+    app.router.add_get("/api/me", me)
     app.router.add_get("/api/workers", list_workers)
     app.router.add_post("/api/dispatch", dispatch)
     app.router.add_post("/api/recall", recall)
-    app.router.add_post("/api/admin/mint", admin_mint)
-    app.router.add_post("/api/admin/revoke", admin_revoke)
-    app.router.add_get("/api/admin/keys", admin_keys)
+    app.router.add_get("/api/assignments", list_assignments)
+    app.router.add_post("/api/worker-keys", mint_worker_key)
+    app.router.add_get("/api/worker-keys", list_my_worker_keys)
+    app.router.add_post("/api/worker-keys/revoke", revoke_my_worker_key)
+    app.router.add_get("/api/specialists", get_specialists)
+    app.router.add_put("/api/specialists/{sid}", put_specialist_override)
+    app.router.add_get("/api/admin/users", admin_users)
+    app.router.add_post("/api/admin/users/{uid}/role", admin_set_role)
     app.router.add_get("/v1/workers/connect", worker_ws)
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_cleanup)
     return app
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="gstack broker (Phase 1)")
+    parser = argparse.ArgumentParser(description="gstack broker (Phase 2)")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8787)
     args = parser.parse_args()
-    print(f"[broker] state={STATE_PATH} admin_token={'set' if ADMIN_TOKEN else 'MISSING'}",
+    print(f"[broker] db={db.DSN}", flush=True)
+    print(f"[broker] clerk={'configured' if auth.CLERK_JWKS_URL else 'DEV-FALLBACK (X-Dev-User-Id)'}",
           flush=True)
-    if not ADMIN_TOKEN:
-        print("[broker] WARNING: GSTACK_ADMIN_TOKEN not set — /api/admin/* will refuse all requests",
+    if not TRANSIENT_AGENTCALL_KEY:
+        print("[broker] WARNING: GSTACK_POOL_AGENTCALL_KEY not set — dispatched bots will lack an API key",
               flush=True)
     web.run_app(build_app(), host=args.host, port=args.port)
 

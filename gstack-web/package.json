@@ -1,0 +1,27 @@
+{
+  "name": "gstack-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6.0.0",
+    "next": "15.0.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "swr": "^2.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "postcss": "^8.4",
+    "typescript": "^5.5"
+  }
+}
