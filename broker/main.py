@@ -272,11 +272,24 @@ async def revoke_my_worker_key(req: web.Request) -> web.Response:
     except Exception:
         body = {}
     raw = body.get("key") or body.get("key_hash") or ""
-    h = _hash_key(raw) if raw.startswith("gw_") else raw
-    row = await db.get_worker_key(h)
-    if not row:
-        return web.json_response({"error": "unknown key"}, status=404)
     is_admin = user_row["role"] == "admin"
+    # Resolve the input to a worker_keys row by one of:
+    #   - plaintext gw_ key (hash, then exact lookup)
+    #   - full 64-char sha256 hash
+    #   - 8+ char hash prefix (the UI only ever sees a 12-char prefix;
+    #     it can't echo the full hash back without us exposing it)
+    if raw.startswith("gw_"):
+        row = await db.get_worker_key(_hash_key(raw))
+    elif len(raw) == 64:
+        row = await db.get_worker_key(raw)
+    else:
+        # Scope the prefix lookup to the caller's keys unless admin, so a
+        # member can't probe other users' keys by trying prefixes.
+        row = await db.find_worker_key_by_prefix(
+            raw, owner_user_id=None if is_admin else user_row["id"])
+    if not row:
+        return web.json_response({"error": "unknown or ambiguous key"}, status=404)
+    h = row["key_hash"]
     if not is_admin and row["owner_user_id"] != user_row["id"]:
         return web.json_response({"error": "forbidden"}, status=403)
     await db.revoke_worker_key(h)

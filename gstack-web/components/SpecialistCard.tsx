@@ -3,11 +3,15 @@ import type { Specialist } from "@/lib/types";
 
 export function SpecialistCard({
   s, selected, onToggle, dense = false,
-}: { s: Specialist; selected: boolean; onToggle: () => void; dense?: boolean }) {
+}: { s: Specialist; selected: boolean; onToggle?: () => void; dense?: boolean }) {
+  // Render as a button only when there's actually something to toggle.
+  // /specialists uses this card in read-only mode; without this, keyboard
+  // users tab through 19 dead buttons with focus rings.
+  const Tag = onToggle ? "button" : "div";
   return (
-    <button
+    <Tag
       onClick={onToggle}
-      className={`card card-hover ${selected ? "card-selected" : ""} text-left w-full anim-up`}
+      className={`card ${onToggle ? "card-hover cursor-pointer" : ""} ${selected ? "card-selected" : ""} text-left w-full anim-up`}
       style={{ animationDelay: `0ms` }}
     >
       <div className="flex items-start gap-3">
@@ -38,6 +42,6 @@ export function SpecialistCard({
         <span className="mono text-[var(--color-muted)]">/{s.id}</span>
         <span className="badge badge-muted">{s.category}</span>
       </div>
-    </button>
+    </Tag>
   );
 }

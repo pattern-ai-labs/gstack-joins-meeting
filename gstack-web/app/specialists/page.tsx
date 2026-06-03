@@ -48,7 +48,7 @@ export default function SpecialistsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((s) => (
-            <SpecialistCard key={s.id} s={s} selected={false} onToggle={() => {}} />
+            <SpecialistCard key={s.id} s={s} selected={false} />
           ))}
         </div>
       )}

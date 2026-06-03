@@ -22,12 +22,14 @@ function Dashboard() {
   const noWorker = workers.length === 0;
 
   return (
-    <div className="flex">
-      <div className="flex-1 min-w-0 px-8 py-8 max-w-5xl">
+    <div className="flex flex-col xl:flex-row">
+      <div className="flex-1 min-w-0 px-6 lg:px-8 py-6 xl:py-8 xl:max-w-3xl 2xl:max-w-5xl">
         {noWorker && <div className="mb-8"><OnboardingFlow onMinted={() => mutate()} /></div>}
         <DispatchPanel />
       </div>
-      <ActiveCallsRail />
+      <div className="xl:order-last px-6 lg:px-8 xl:px-0 pb-6 xl:pb-0">
+        <ActiveCallsRail />
+      </div>
     </div>
   );
 }

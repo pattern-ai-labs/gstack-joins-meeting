@@ -26,3 +26,7 @@ export function StubUserButton() {
 export function useStubAuth() {
   return { getToken: async () => null };
 }
+
+export function useStubIsSignedIn() {
+  return true; // dev mode: synthetic user is always "signed in"
+}

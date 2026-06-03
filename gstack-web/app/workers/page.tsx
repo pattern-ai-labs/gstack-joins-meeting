@@ -13,9 +13,6 @@ export default function WorkersPage() {
 
   const keys = keysResp?.keys ?? [];
   const workers = workersResp?.workers ?? [];
-  const onlineKeys = new Set(
-    workers.map((w) => keys.find((k) => k.label && k.label === w.name)?.key_hash_prefix).filter(Boolean) as string[]
-  );
 
   async function revoke(prefix: string, label: string) {
     if (!confirm(`Revoke "${label}"? Any worker using this key will be disconnected.`)) return;

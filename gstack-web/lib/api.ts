@@ -1,5 +1,5 @@
 "use client";
-import { useAuth } from "@/lib/auth";
+import { useAuth, useIsSignedIn } from "@/lib/auth";
 import useSWR, { type SWRResponse } from "swr";
 
 /** Fetch wrapper that attaches the Clerk session JWT to every request. */
@@ -27,7 +27,23 @@ export function useApi() {
   return call;
 }
 
-export function useApiSWR<T = unknown>(path: string | null): SWRResponse<T> {
+/**
+ * SWR wrapper for authenticated GETs. By default it auto-skips when the
+ * user is signed out — the broker would 401 us and pollute logs. Pass
+ * `path: null` (standard SWR pattern) to skip for other reasons (e.g.
+ * waiting on a prerequisite). Pass `{ allowSignedOut: true }` to force
+ * a fetch (e.g. a future public endpoint).
+ */
+export function useApiSWR<T = unknown>(
+  path: string | null,
+  opts: { allowSignedOut?: boolean; refreshInterval?: number } = {},
+): SWRResponse<T> {
   const call = useApi();
-  return useSWR<T>(path, async (p: string) => call<T>(p));
+  const signedIn = useIsSignedIn();
+  const key = path && (signedIn || opts.allowSignedOut) ? path : null;
+  return useSWR<T>(
+    key,
+    async (p: string) => call<T>(p),
+    opts.refreshInterval ? { refreshInterval: opts.refreshInterval } : undefined,
+  );
 }

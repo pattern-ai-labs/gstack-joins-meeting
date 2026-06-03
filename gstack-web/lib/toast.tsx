@@ -20,7 +20,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={{ push }}>
       {children}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm">
+      <div
+        className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm"
+        role="status" aria-live="polite" aria-atomic="true"
+      >
         {items.map((t) => <ToastView key={t.id} t={t} onDismiss={() => setItems((cur) => cur.filter((x) => x.id !== t.id))} />)}
       </div>
     </ToastCtx.Provider>

@@ -131,6 +131,35 @@ async def get_worker_key(key_hash: str) -> Optional[dict]:
             return await cur.fetchone()
 
 
+async def find_worker_key_by_prefix(prefix: str, owner_user_id: Optional[str] = None) -> Optional[dict]:
+    """Resolve a (12+ char) hash prefix to a full key row.
+
+    Used by the UI's revoke flow, which only shows the prefix to keep the
+    full hash out of the page source. Returns None if no match or if the
+    prefix is ambiguous (two keys with the same prefix — astronomically
+    unlikely but we refuse rather than guess).
+    """
+    if len(prefix) < 8:
+        return None
+    pool = await init_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            if owner_user_id:
+                await cur.execute(
+                    "SELECT * FROM worker_keys WHERE key_hash LIKE %s AND owner_user_id=%s",
+                    (prefix + "%", owner_user_id),
+                )
+            else:
+                await cur.execute(
+                    "SELECT * FROM worker_keys WHERE key_hash LIKE %s",
+                    (prefix + "%",),
+                )
+            rows = await cur.fetchall()
+    if len(rows) != 1:
+        return None
+    return rows[0]
+
+
 async def list_worker_keys(owner_user_id: Optional[str] = None) -> list[dict]:
     pool = await init_pool()
     async with pool.connection() as conn:

@@ -30,9 +30,13 @@ export function OnboardingFlow({ onMinted }: { onMinted: () => void }) {
     }
   }
 
-  function copy(s: string, label: string) {
-    navigator.clipboard.writeText(s);
-    toast.push({ kind: "ok", title: `${label} copied` });
+  async function copy(s: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(s);
+      toast.push({ kind: "ok", title: `${label} copied` });
+    } catch {
+      toast.push({ kind: "err", title: `Couldn't copy ${label.toLowerCase()}`, body: "Browser blocked clipboard access — select and copy manually." });
+    }
   }
 
   const install = key

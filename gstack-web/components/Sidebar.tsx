@@ -89,6 +89,7 @@ function UserPill() {
   const u = meResp?.user;
   if (!u) return null;
   const used = u.minutes_used, quota = u.quota_minutes;
+  const over = quota > 0 && used > quota;
   const pct = Math.min(100, Math.round((used / Math.max(1, quota)) * 100));
   return (
     <div className="m-3 p-3 surface text-[12px] space-y-2">
@@ -102,12 +103,12 @@ function UserPill() {
       </div>
       <div>
         <div className="flex items-center justify-between text-[11px] text-[var(--color-muted)] mb-1">
-          <span>usage</span>
+          <span>{over ? <span className="text-[var(--color-bad)]">over quota</span> : "usage"}</span>
           <span className="mono">{used} / {quota} min</span>
         </div>
         <div className="h-1 rounded-full bg-[var(--color-border)] overflow-hidden">
           <div
-            className="h-full bg-[var(--color-accent)] transition-all"
+            className={`h-full transition-all ${over ? "bg-[var(--color-bad)]" : "bg-[var(--color-accent)]"}`}
             style={{ width: `${pct}%` }}
           />
         </div>

@@ -19,7 +19,15 @@ let prodMiddleware: ClerkLikeHandler | null = null;
 async function getProdMiddleware(): Promise<ClerkLikeHandler> {
   if (prodMiddleware) return prodMiddleware;
   const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
-  const isProtected = createRouteMatcher(["/workers(.*)", "/admin(.*)"]);
+  // Everything beyond the marketing landing requires auth. Even
+  // /specialists is a logged-in-only page in production because it reads
+  // per-tenant overrides (description, voice). The landing at "/" is the
+  // only public route — and it renders <SignedOut><Marketing/></SignedOut>
+  // so signed-in users still get the dashboard there.
+  const isProtected = createRouteMatcher([
+    "/workers(.*)", "/admin(.*)",
+    "/specialists(.*)", "/calls(.*)",
+  ]);
   prodMiddleware = clerkMiddleware(async (auth, req) => {
     if (isProtected(req)) await auth.protect();
   }) as unknown as ClerkLikeHandler;

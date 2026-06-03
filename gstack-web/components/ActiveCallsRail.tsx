@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi, useApiSWR } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import type { Assignment, Worker } from "@/lib/types";
@@ -7,8 +7,13 @@ import type { Assignment, Worker } from "@/lib/types";
 export function ActiveCallsRail() {
   const call = useApi();
   const toast = useToast();
-  const { data: workersResp, mutate: refreshWorkers } = useApiSWR<{ workers: Worker[] }>("/api/workers");
-  const { data: assignsResp, mutate: refreshAssignments } = useApiSWR<{ assignments: Assignment[] }>("/api/assignments");
+  // Workers refresh every 5s, assignments every 4s — keeps the rail live
+  // without hammering the broker, and the elapsed timer's per-second
+  // re-render is handled locally by useTicker below.
+  const { data: workersResp, mutate: refreshWorkers }
+    = useApiSWR<{ workers: Worker[] }>("/api/workers",     { refreshInterval: 5000 });
+  const { data: assignsResp, mutate: refreshAssignments }
+    = useApiSWR<{ assignments: Assignment[] }>("/api/assignments", { refreshInterval: 4000 });
 
   const workers = workersResp?.workers ?? [];
   const active = (assignsResp?.assignments ?? []).filter((a) => a.status === "started");
@@ -16,7 +21,8 @@ export function ActiveCallsRail() {
   async function recall(worker_id?: string) {
     try {
       const r = await call<{ recalled: number }>("/api/recall", {
-        method: "POST", body: JSON.stringify(worker_id ? { worker_id } : { all: true }),
+        method: "POST",
+        body: JSON.stringify(worker_id ? { worker_id } : {}),
       });
       toast.push({ kind: "ok", title: "Recalled", body: `${r.recalled} worker${r.recalled === 1 ? "" : "s"} freed` });
       refreshWorkers(); refreshAssignments();
@@ -26,7 +32,7 @@ export function ActiveCallsRail() {
   }
 
   return (
-    <aside className="w-[320px] shrink-0 h-[calc(100vh-32px)] sticky top-4 mr-4 my-4 surface flex flex-col anim-fade">
+    <aside className="w-full xl:w-[320px] shrink-0 xl:h-[calc(100vh-32px)] xl:sticky xl:top-4 xl:mr-4 xl:my-4 surface flex flex-col anim-fade">
       <div className="px-4 py-3 border-b border-[var(--color-border)] flex items-center justify-between">
         <div>
           <div className="text-[13px] font-semibold">Now in meeting</div>
@@ -37,7 +43,7 @@ export function ActiveCallsRail() {
         )}
       </div>
 
-      <div className="flex-1 scroll-y px-4 py-3 space-y-3">
+      <div className="flex-1 scroll-y px-4 py-3 space-y-3 max-h-[60vh] xl:max-h-none">
         {active.length === 0 && workers.length === 0 && (
           <EmptyRail title="No workers online" body="Start a worker daemon on a machine you own. Open Workers → mint a key → run the one-liner." />
         )}
@@ -56,49 +62,56 @@ export function ActiveCallsRail() {
   );
 }
 
+/* Per-second tick for elapsed-time text. Throttled to 1s and only runs
+ * while a tab is visible (Page Visibility API) to avoid burning CPU on
+ * backgrounded tabs. */
+function useTicker(active: boolean): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    let id: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (id != null) return;
+      id = setInterval(() => setTick((t) => t + 1), 1000);
+    };
+    const stop = () => {
+      if (id != null) { clearInterval(id); id = null; }
+    };
+    const onVisibility = () => (document.visibilityState === "visible" ? start() : stop());
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [active]);
+  return tick;
+}
+
 function ActiveCallCard({ a, onRecall }: { a: Assignment; onRecall: (worker_id?: string) => void }) {
-  const [msg, setMsg] = useState("");
-  const call = useApi();
-  const toast = useToast();
-
-  async function sendMessage() {
-    if (!msg.trim()) return;
-    try {
-      // Phase 2 doesn't yet have a /api/say endpoint — placeholder for the
-      // broker→worker stdin pipe we'll add in Phase 3. For now: chat-via-recall-tunnel
-      // would need that endpoint. Show "coming soon" toast.
-      toast.push({ kind: "info", title: "Speak via outbox", body: "Direct UI→bot messaging ships in Phase 3. For now: edit the bot's outbox on the worker." });
-      setMsg("");
-    } catch (e) {
-      toast.push({ kind: "err", title: "Send failed", body: (e as Error).message });
-    }
-  }
-
+  useTicker(true); // 1Hz re-render so elapsed text counts up live
   const start = a.created_at ? new Date(a.created_at).getTime() : Date.now();
   const elapsed = Math.max(0, Math.round((Date.now() - start) / 1000));
   const meetHost = (() => { try { return new URL(a.meet_url).hostname; } catch { return a.meet_url; } })();
 
   return (
-    <div className="surface p-3 anim-up">
+    <div className="surface p-3">
       <div className="flex items-center gap-2 mb-2">
         <span className="dot dot-warn pulse" />
-        <span className="text-[12px] font-medium">{a.specialists.join(", ")}</span>
+        <span className="text-[12px] font-medium truncate">{a.specialists.join(", ")}</span>
         <span className="ml-auto badge badge-warn">live</span>
       </div>
       <div className="text-[11px] text-[var(--color-muted)] truncate mono">{meetHost}</div>
-      <div className="text-[11px] text-[var(--color-muted)] mt-1">{Math.floor(elapsed / 60)}m {elapsed % 60}s · {a.mode}</div>
-      <div className="mt-3 flex gap-2">
-        <input
-          value={msg} onChange={(e) => setMsg(e.target.value)}
-          placeholder="Send a quick line…"
-          className="flex-1 !py-1.5 !px-2 text-[12px]"
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-        />
-        <button className="btn btn-outline text-[11px] py-1.5 px-2.5" onClick={sendMessage}>Say</button>
+      <div className="text-[11px] text-[var(--color-muted)] mt-1 mono">
+        {String(Math.floor(elapsed / 60)).padStart(2, "0")}:{String(elapsed % 60).padStart(2, "0")} · {a.mode}
       </div>
-      <button className="btn btn-danger text-[11px] py-1.5 w-full mt-2" onClick={() => onRecall(a.worker_id)}>
+      <button className="btn btn-danger text-[11px] py-1.5 w-full mt-3" onClick={() => onRecall(a.worker_id)}>
         End this call
       </button>
+      <div className="mt-2 text-[10px] text-[var(--color-muted)] text-center">
+        Direct messaging from the dashboard ships in the next release.
+        For now, ask your local Claude session to speak through the bot's outbox.
+      </div>
     </div>
   );
 }

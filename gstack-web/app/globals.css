@@ -29,9 +29,11 @@
   --color-bad:        #f87171;
   --color-info:       #60a5fa;
 
-  /* type */
-  --font-sans:        "InterVariable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono:        "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  /* type — `--font-sans-loaded` and `--font-mono-loaded` are injected by
+     next/font/google in app/layout.tsx (self-hosted, no CLS). Fall back
+     to system-ui until they load. */
+  --font-sans:        var(--font-sans-loaded), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:        var(--font-mono-loaded), ui-monospace, "SF Mono", monospace;
 
   /* motion */
   --ease-out-cubic:   cubic-bezier(0.16, 1, 0.3, 1);

@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApi, useApiSWR } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { SpecialistCard } from "./SpecialistCard";
@@ -30,6 +30,15 @@ export function DispatchPanel() {
   const [brief, setBrief] = useState("");
   const [showBrief, setShowBrief] = useState(false);
   const [mode, setMode] = useState<"avatar" | "audio">("avatar");
+  // Restore the last-used mode from localStorage so a user who switched
+  // to audio for cost/latency stays on audio after a refresh.
+  useEffect(() => {
+    const saved = typeof window !== "undefined" && window.localStorage.getItem("gstack:mode");
+    if (saved === "avatar" || saved === "audio") setMode(saved);
+  }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem("gstack:mode", mode);
+  }, [mode]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
