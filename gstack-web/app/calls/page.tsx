@@ -44,9 +44,19 @@ export default function CallsPage() {
                       {when ? when.toLocaleString() : "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1 flex-wrap">
+                      <div className="flex gap-1.5 flex-wrap items-center">
                         {a.specialists.map((id) => (
-                          <span key={id} className="badge badge-muted mono">/{id}</span>
+                          <span key={id} className="badge badge-muted mono inline-flex items-center gap-1.5 !py-1 !pl-1 !pr-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`/avatars/${id}.svg`}
+                              alt=""
+                              width={16} height={16}
+                              className="w-4 h-4 rounded-full"
+                              loading="lazy"
+                            />
+                            /{id}
+                          </span>
                         ))}
                       </div>
                       {a.brief && <div className="text-[11px] text-[var(--color-muted)] mt-1 italic">{a.brief}</div>}

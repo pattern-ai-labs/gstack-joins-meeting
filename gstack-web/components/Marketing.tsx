@@ -203,16 +203,15 @@ function SpecialistMarquee() {
         <div className="flex gap-3 animate-marquee" style={{ width: "max-content" }}>
           {row.map((s, i) => (
             <div key={`${s.id}-${i}`} className="card flex items-center gap-3 px-4 py-3 shrink-0 min-w-[210px]">
-              <span
-                className="w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-bold shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, ${s.accent}33, ${s.accent}11)`,
-                  color: s.accent,
-                  boxShadow: `inset 0 0 0 1px ${s.accent}44`,
-                }}
-              >
-                {s.glyph}
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/avatars/${s.id}.svg`}
+                alt=""
+                width={40} height={40}
+                className="w-10 h-10 rounded-full shrink-0"
+                style={{ boxShadow: `inset 0 0 0 1px ${s.accent}55` }}
+                loading="lazy"
+              />
               <div>
                 <div className="font-medium text-[13px]">{s.name}</div>
                 <div className="text-[11px] text-[var(--color-muted)]">{s.role}</div>

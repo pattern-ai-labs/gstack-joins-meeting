@@ -98,7 +98,25 @@ function ActiveCallCard({ a, onRecall }: { a: Assignment; onRecall: (worker_id?:
     <div className="surface p-3">
       <div className="flex items-center gap-2 mb-2">
         <span className="dot dot-warn pulse" />
-        <span className="text-[12px] font-medium truncate">{a.specialists.join(", ")}</span>
+        <div className="flex -space-x-1.5">
+          {a.specialists.slice(0, 4).map((id) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={id}
+              src={`/avatars/${id}.svg`}
+              alt={id}
+              title={id}
+              width={20} height={20}
+              className="w-5 h-5 rounded-full ring-1 ring-[var(--color-bg)]"
+              loading="lazy"
+            />
+          ))}
+          {a.specialists.length > 4 && (
+            <span className="w-5 h-5 rounded-full bg-[var(--color-panel-2)] text-[9px] flex items-center justify-center ring-1 ring-[var(--color-bg)]">
+              +{a.specialists.length - 4}
+            </span>
+          )}
+        </div>
         <span className="ml-auto badge badge-warn">live</span>
       </div>
       <div className="text-[11px] text-[var(--color-muted)] truncate mono">{meetHost}</div>

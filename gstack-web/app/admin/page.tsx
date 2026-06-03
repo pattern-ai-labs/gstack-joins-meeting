@@ -133,7 +133,19 @@ export default function AdminPage() {
                     }`}>{a.status}</span>
                   </td>
                   <td className="px-4 py-3 mono text-[11.5px] text-[var(--color-fg-soft)]">{a.user_id}</td>
-                  <td className="px-4 py-3 text-[var(--color-fg-soft)]">{a.specialists.join(", ")}</td>
+                  <td className="px-4 py-3 text-[var(--color-fg-soft)]">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex -space-x-1">
+                        {a.specialists.slice(0, 5).map((id) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={id} src={`/avatars/${id}.svg`} alt="" title={id}
+                               width={20} height={20}
+                               className="w-5 h-5 rounded-full ring-1 ring-[var(--color-panel)]" loading="lazy" />
+                        ))}
+                      </div>
+                      <span className="text-[11.5px]">{a.specialists.join(", ")}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-right mono text-[11.5px] text-[var(--color-fg-soft)]">
                     {a.billable_seconds ? `${a.billable_seconds}s` : "—"}
                   </td>

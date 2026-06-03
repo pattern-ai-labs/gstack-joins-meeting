@@ -15,16 +15,19 @@ export function SpecialistCard({
       style={{ animationDelay: `0ms` }}
     >
       <div className="flex items-start gap-3">
-        <div
-          className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-base font-bold"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/avatars/${s.id}.svg`}
+          alt=""
+          width={44} height={44}
+          className="shrink-0 w-11 h-11 rounded-full"
           style={{
-            background: `linear-gradient(135deg, ${s.accent}33, ${s.accent}11)`,
-            color: s.accent,
-            boxShadow: selected ? `0 0 0 2px ${s.accent}` : `inset 0 0 0 1px ${s.accent}33`,
+            boxShadow: selected
+              ? `0 0 0 2px ${s.accent}, 0 0 0 5px ${s.accent}22`
+              : `inset 0 0 0 1px ${s.accent}33`,
           }}
-        >
-          {s.glyph}
-        </div>
+          loading="lazy"
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-2">
             <span className="font-medium text-[14px]">{s.card_name || s.name}</span>
