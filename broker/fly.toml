@@ -32,8 +32,7 @@ primary_region = "iad"
     interval     = "30s"
     method       = "get"
     timeout      = "5s"
-    path         = "/api/me"
-    # /api/me returns 401 unauthenticated — that's healthy; we just want a 4xx not 5xx.
+    path         = "/healthz"
 
 [[vm]]
   cpu_kind  = "shared"

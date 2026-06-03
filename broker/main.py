@@ -60,6 +60,11 @@ except ImportError:
 
 TRANSIENT_AGENTCALL_KEY = os.environ.get("GSTACK_POOL_AGENTCALL_KEY", "")
 
+# Comma-separated list of origins allowed to call /api/*. In production
+# this should be the gstack-web Vercel URL. Empty = mirror request origin
+# (dev-friendly, opens CORS to anyone — fine for local docker-compose).
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("GSTACK_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # in-memory worker registry (live WS connections)
@@ -486,11 +491,20 @@ async def cors_middleware(req: web.Request, handler):
 
 
 def _add_cors(resp: web.StreamResponse, req: web.Request) -> None:
-    origin = req.headers.get("origin", "*")
-    resp.headers["Access-Control-Allow-Origin"]      = origin
+    origin = req.headers.get("origin", "")
+    if ALLOWED_ORIGINS:
+        # Production: only echo the request origin if it's on the allow-list.
+        # Reject silently (no ACAO header) for unknown origins — the browser
+        # blocks the response, exactly what we want.
+        if origin in ALLOWED_ORIGINS:
+            resp.headers["Access-Control-Allow-Origin"] = origin
+    else:
+        # Dev: mirror whatever origin the request came from (or "*" if absent).
+        resp.headers["Access-Control-Allow-Origin"] = origin or "*"
     resp.headers["Access-Control-Allow-Credentials"] = "true"
     resp.headers["Access-Control-Allow-Headers"]     = "authorization, content-type, x-dev-user-id"
     resp.headers["Access-Control-Allow-Methods"]     = "GET, POST, PUT, DELETE, OPTIONS"
+    resp.headers["Vary"]                             = "Origin"
 
 
 def _cors_preflight(req: web.Request) -> web.Response:
@@ -499,8 +513,28 @@ def _cors_preflight(req: web.Request) -> web.Response:
     return resp
 
 
+async def healthz(req: web.Request) -> web.Response:
+    """Liveness probe — no auth, no DB. 200 means the process is up."""
+    return web.json_response({"ok": True})
+
+
+async def readyz(req: web.Request) -> web.Response:
+    """Readiness probe — also checks the DB is reachable."""
+    try:
+        pool = await db.init_pool()
+        async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT 1")
+                await cur.fetchone()
+        return web.json_response({"ok": True, "db": "ready"})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=503)
+
+
 def build_app() -> web.Application:
     app = web.Application(middlewares=[cors_middleware, auth.auth_middleware])
+    app.router.add_get("/healthz", healthz)
+    app.router.add_get("/readyz", readyz)
     app.router.add_get("/api/me", me)
     app.router.add_get("/api/workers", list_workers)
     app.router.add_post("/api/dispatch", dispatch)
