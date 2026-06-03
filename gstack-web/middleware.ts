@@ -12,21 +12,24 @@ function devMiddleware(_req: NextRequest) {
 
 // Prod mode: wrap with Clerk middleware. Imported lazily so a missing
 // CLERK_SECRET_KEY in dev doesn't crash the import-time module init.
-let prodMiddleware: ((req: NextRequest) => Promise<Response> | Response) | null = null;
-async function getProdMiddleware() {
+// Clerk's middleware signature is (NextRequest, NextFetchEvent) but it's
+// permissive about the second arg; we just forward whatever Next gives us.
+type ClerkLikeHandler = (req: NextRequest, evt: unknown) => Response | Promise<Response>;
+let prodMiddleware: ClerkLikeHandler | null = null;
+async function getProdMiddleware(): Promise<ClerkLikeHandler> {
   if (prodMiddleware) return prodMiddleware;
   const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
   const isProtected = createRouteMatcher(["/workers(.*)", "/admin(.*)"]);
   prodMiddleware = clerkMiddleware(async (auth, req) => {
     if (isProtected(req)) await auth.protect();
-  });
+  }) as unknown as ClerkLikeHandler;
   return prodMiddleware;
 }
 
-export default async function middleware(req: NextRequest) {
+export default async function middleware(req: NextRequest, evt: unknown) {
   if (!HAS_CLERK) return devMiddleware(req);
   const handler = await getProdMiddleware();
-  return handler(req);
+  return handler(req, evt);
 }
 
 export const config = {

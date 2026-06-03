@@ -1,87 +1,158 @@
 "use client";
 import { useApi, useApiSWR } from "@/lib/api";
+import { useToast } from "@/lib/toast";
 import type { User, Assignment, Worker } from "@/lib/types";
 
 export default function AdminPage() {
   const call = useApi();
-  const { data: meResp } = useApiSWR<{ user: User }>("/api/me");
-  const { data: usersResp, mutate: refreshUsers } = useApiSWR<{ users: User[] }>("/api/admin/users");
-  const { data: workersResp } = useApiSWR<{ workers: Worker[] }>("/api/workers");
-  const { data: assignsResp } = useApiSWR<{ assignments: Assignment[] }>("/api/assignments");
+  const toast = useToast();
+  const { data: usersResp,   mutate: refreshUsers } = useApiSWR<{ users: User[] }>("/api/admin/users");
+  const { data: workersResp }                       = useApiSWR<{ workers: Worker[] }>("/api/workers");
+  const { data: assignsResp }                       = useApiSWR<{ assignments: Assignment[] }>("/api/assignments");
 
-  if (!meResp) return <div className="muted">…</div>;
-  if (meResp.user.role !== "admin") {
-    return (
-      <div className="card">
-        <h1 className="text-xl font-semibold mb-2">Admin</h1>
-        <p className="muted">You don't have admin access. Ask the first user (auto-admin on first sign-in) to promote you.</p>
-      </div>
-    );
-  }
+  const users = usersResp?.users ?? [];
+  const workers = workersResp?.workers ?? [];
+  const assignments = assignsResp?.assignments ?? [];
 
   async function setRole(uid: string, role: "admin" | "member") {
-    await call(`/api/admin/users/${uid}/role`, {
-      method: "POST", body: JSON.stringify({ role }),
-    });
-    refreshUsers();
+    try {
+      await call(`/api/admin/users/${uid}/role`, { method: "POST", body: JSON.stringify({ role }) });
+      toast.push({ kind: "ok", title: "Role updated" });
+      refreshUsers();
+    } catch (e) {
+      toast.push({ kind: "err", title: "Update failed", body: (e as Error).message });
+    }
   }
 
+  const totalMin = users.reduce((sum, u) => sum + u.minutes_used, 0);
+  const activeNow = assignments.filter((a) => a.status === "started").length;
+
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">Admin</h1>
+    <div className="max-w-5xl mx-auto px-8 py-8 anim-fade space-y-8">
+      <header>
+        <h1 className="text-[26px] font-semibold tracking-tight">Admin</h1>
+        <p className="text-[13px] text-[var(--color-fg-soft)] mt-1">
+          You see everything: every user, every worker, every dispatch.
+        </p>
+      </header>
 
+      {/* metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Metric label="Users"            value={users.length} />
+        <Metric label="Workers online"   value={workers.length} sub={`${workers.filter((w) => w.state === "idle").length} idle`} />
+        <Metric label="Active calls"     value={activeNow} />
+        <Metric label="Total minutes"    value={totalMin} />
+      </div>
+
+      {/* users */}
       <section>
-        <h2 className="font-semibold mb-3">All users <span className="muted text-xs">({usersResp?.users.length ?? 0})</span></h2>
-        <div className="space-y-2">
-          {(usersResp?.users ?? []).map((u) => (
-            <div key={u.id} className="card flex items-center gap-3 text-sm">
-              <div className="flex-1">
-                <div className="font-semibold">{u.display_name || u.email || u.id}</div>
-                <div className="muted text-xs">{u.email} · {u.plan} · {u.minutes_used}/{u.quota_minutes} min used</div>
+        <h2 className="text-[15px] font-semibold mb-3">All users</h2>
+        <div className="surface overflow-hidden">
+          <table className="w-full text-[12.5px]">
+            <thead className="bg-[var(--color-panel-2)] text-[10px] uppercase tracking-wider text-[var(--color-muted)]">
+              <tr>
+                <th className="px-4 py-2.5 text-left font-semibold">User</th>
+                <th className="px-4 py-2.5 text-left font-semibold">Plan</th>
+                <th className="px-4 py-2.5 text-right font-semibold">Usage</th>
+                <th className="px-4 py-2.5 text-right font-semibold">Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id} className="border-t border-[var(--color-border)] hover:bg-[var(--color-panel-2)] transition">
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{u.display_name || u.email || u.id}</div>
+                    <div className="text-[11px] text-[var(--color-muted)]">{u.email || u.id}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="badge badge-muted">{u.plan}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right mono text-[11.5px] text-[var(--color-fg-soft)]">
+                    {u.minutes_used}/{u.quota_minutes} min
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <select
+                      value={u.role}
+                      onChange={(e) => setRole(u.id, e.target.value as "admin" | "member")}
+                      className="!py-1 !px-2 !w-auto inline-block text-[11px]"
+                    >
+                      <option value="member">member</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* workers */}
+      <section>
+        <h2 className="text-[15px] font-semibold mb-3">All workers <span className="text-[12px] text-[var(--color-muted)] font-normal ml-1">({workers.length})</span></h2>
+        {workers.length === 0 ? (
+          <div className="surface p-6 text-[12.5px] text-[var(--color-muted)] text-center">No workers online.</div>
+        ) : (
+          <div className="space-y-2">
+            {workers.map((w) => (
+              <div key={w.id} className="card flex items-center gap-3">
+                <span className={`dot ${w.state === "idle" ? "dot-ok" : "dot-warn"}`} />
+                <div className="flex-1">
+                  <div className="text-[13px] font-medium">{w.name}</div>
+                  <div className="text-[11px] text-[var(--color-muted)]">{w.platform} · owner <span className="mono">{w.owner_user_id}</span></div>
+                </div>
+                <span className="mono text-[11px] text-[var(--color-muted)]">{w.id}</span>
+                <span className={`badge ${w.state === "idle" ? "badge-ok" : "badge-warn"}`}>{w.state}</span>
               </div>
-              <span className={`px-2 py-0.5 rounded text-xs ${u.role === "admin" ? "bg-[var(--color-accent)] text-black" : "bg-[var(--color-border)]"}`}>{u.role}</span>
-              <select value={u.role} onChange={(e) => setRole(u.id, e.target.value as "admin" | "member")}
-                      className="w-32 text-xs">
-                <option value="member">member</option>
-                <option value="admin">admin</option>
-              </select>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
+      {/* recent dispatches */}
       <section>
-        <h2 className="font-semibold mb-3">All workers</h2>
-        <div className="space-y-2">
-          {(workersResp?.workers ?? []).map((w) => (
-            <div key={w.id} className="card flex items-center gap-3 text-sm">
-              <span className={`w-2 h-2 rounded-full ${w.state === "idle" ? "bg-green-400" : "bg-orange-400"}`} />
-              <div className="flex-1">
-                <div className="font-semibold">{w.name}</div>
-                <div className="muted text-xs">{w.platform} · owner {w.owner_user_id}</div>
-              </div>
-              <span className="muted text-xs font-mono">{w.id}</span>
-            </div>
-          ))}
+        <h2 className="text-[15px] font-semibold mb-3">Recent dispatches</h2>
+        <div className="surface overflow-hidden">
+          <table className="w-full text-[12.5px]">
+            <thead className="bg-[var(--color-panel-2)] text-[10px] uppercase tracking-wider text-[var(--color-muted)]">
+              <tr>
+                <th className="px-4 py-2.5 text-left font-semibold">Status</th>
+                <th className="px-4 py-2.5 text-left font-semibold">User</th>
+                <th className="px-4 py-2.5 text-left font-semibold">Specialists</th>
+                <th className="px-4 py-2.5 text-right font-semibold">Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assignments.slice(0, 25).map((a) => (
+                <tr key={a.id} className="border-t border-[var(--color-border)] hover:bg-[var(--color-panel-2)] transition">
+                  <td className="px-4 py-3">
+                    <span className={`badge ${
+                      a.status === "started" ? "badge-warn" :
+                      a.status === "ended"   ? "badge-ok"   :
+                      "badge-bad"
+                    }`}>{a.status}</span>
+                  </td>
+                  <td className="px-4 py-3 mono text-[11.5px] text-[var(--color-fg-soft)]">{a.user_id}</td>
+                  <td className="px-4 py-3 text-[var(--color-fg-soft)]">{a.specialists.join(", ")}</td>
+                  <td className="px-4 py-3 text-right mono text-[11.5px] text-[var(--color-fg-soft)]">
+                    {a.billable_seconds ? `${a.billable_seconds}s` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
+    </div>
+  );
+}
 
-      <section>
-        <h2 className="font-semibold mb-3">All assignments</h2>
-        <div className="space-y-2">
-          {(assignsResp?.assignments ?? []).slice(0, 30).map((a) => (
-            <div key={a.id} className="card flex items-center gap-3 text-sm">
-              <span className={`px-2 py-0.5 rounded text-xs ${a.status === "ended" ? "bg-green-900 text-green-300"
-                  : a.status === "started" ? "bg-orange-900 text-orange-300"
-                  : "bg-red-900 text-red-300"}`}>{a.status}</span>
-              <span className="font-mono text-xs muted">{a.id.slice(0, 16)}</span>
-              <span className="muted text-xs">{a.user_id.slice(0, 12)}</span>
-              <span className="flex-1 truncate">{a.specialists.join(", ")}</span>
-              <span className="muted text-xs">{a.billable_seconds ? `${a.billable_seconds}s` : ""}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+function Metric({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
+  return (
+    <div className="card">
+      <div className="label-cap">{label}</div>
+      <div className="text-[24px] font-semibold mt-1 tracking-tight">{value}</div>
+      {sub && <div className="text-[11px] text-[var(--color-muted)] mt-1">{sub}</div>}
     </div>
   );
 }
