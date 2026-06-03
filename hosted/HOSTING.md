@@ -4,9 +4,9 @@ The repo now ships three runnable pieces:
 
 | Piece | Where | Runs on | Stack |
 |---|---|---|---|
-| **broker** | `broker/` | Fly.io / Railway / any Docker host | Python 3.12 + aiohttp + psycopg + Clerk JWT |
-| **frontend** | `gstack-web/` | Vercel | Next.js 15 + Clerk + Tailwind v4 |
-| **worker** | `worker.py` (root) | user's laptop or any box with Claude Code | Python 3 stdlib + websockets |
+| **broker** | `hosted/broker/` | Fly.io / Railway / any Docker host | Python 3.12 + aiohttp + psycopg + Clerk JWT |
+| **frontend** | `hosted/gstack-web/` | Vercel | Next.js 15 + Clerk + Tailwind v4 |
+| **worker** | `hosted/worker.py` | user's laptop or any box with Claude Code | Python 3 stdlib + websockets |
 
 Add Postgres (Supabase, Fly Postgres, Neon, or RDS) and you have a
 multi-tenant hosted gstack.
@@ -45,10 +45,10 @@ multi-tenant hosted gstack.
 
 ```bash
 # 1. Bring up Postgres + broker.
-docker compose up postgres broker
+docker compose -f hosted/docker-compose.yml up postgres broker
 
 # 2. Frontend (separate terminal).
-cd gstack-web
+cd hosted/gstack-web
 cp .env.example .env.local       # paste Clerk keys (free dev instance is fine)
 npm install
 npm run dev
@@ -83,7 +83,7 @@ Easiest: Supabase (free tier). Copy the connection string from
 ### 2. Broker → Fly.io
 
 ```bash
-cd broker
+cd hosted/broker
 fly launch --no-deploy --name gstack-broker
 fly secrets set \
   DATABASE_URL="postgresql://...your supabase connection string..." \
@@ -93,13 +93,13 @@ fly secrets set \
 fly deploy
 ```
 
-(The `fly.toml` in `broker/` is preconfigured. The Dockerfile is
-self-contained — it COPYs `broker/` and `data/` only.)
+(The `fly.toml` in `hosted/broker/` is preconfigured. The Dockerfile is
+self-contained — it COPYs `hosted/broker/` and `data/` only.)
 
 ### 3. Frontend → Vercel
 
 ```bash
-cd gstack-web
+cd hosted/gstack-web
 vercel link
 vercel env add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY production
 vercel env add CLERK_SECRET_KEY production
@@ -135,7 +135,7 @@ The Claude Code session in the same terminal is the brain — see
 | Deploy | local-only | Vercel + Fly.io + Postgres |
 
 The dispatch protocol over the WS is unchanged — Phase 1 workers
-connect to a Phase 2 broker without any change to `worker.py`.
+connect to a Phase 2 broker without any change to `hosted/worker.py`.
 
 ---
 

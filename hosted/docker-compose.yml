@@ -1,13 +1,15 @@
-# Local end-to-end stack for Phase-2 hosted gstack.
+# Local end-to-end stack for the hosted (Tier-1) gstack experience.
+# Runs from the repo root because the broker Dockerfile pulls in ../data/.
 #
-#   docker compose up postgres broker            # backend
-#   cd gstack-web && npm install && npm run dev  # frontend (separate terminal)
+#   (from repo root)
+#   docker compose -f hosted/docker-compose.yml up postgres broker
+#   cd hosted/gstack-web && npm install && npx next dev -p 3030
 #
 # Bring a worker in (requires a gw_ key minted via the web UI or REST):
-#   GW=gw_... docker compose up worker
+#   GW=gw_... docker compose -f hosted/docker-compose.yml up worker
 #
 # Production deploy is: broker → Fly.io, postgres → Fly Postgres or Supabase,
-# frontend → Vercel. See broker/fly.toml and gstack-web/README.md.
+# frontend → Vercel. See HOSTING.md.
 
 services:
   postgres:
@@ -28,12 +30,11 @@ services:
 
   broker:
     build:
-      context: .
-      dockerfile: broker/Dockerfile
+      context: ..                            # repo root
+      dockerfile: hosted/broker/Dockerfile
     environment:
       DATABASE_URL:                postgresql://gstack:gstack@postgres:5432/gstack
       # Leave CLERK_JWKS_URL unset to use the dev-fallback (X-Dev-User-Id).
-      # Set it to enable real auth even in compose.
       # CLERK_JWKS_URL:            https://<your>.clerk.accounts.dev/.well-known/jwks.json
       # CLERK_ISSUER:              https://<your>.clerk.accounts.dev
       GSTACK_POOL_AGENTCALL_KEY:   ${AGENTCALL_API_KEY:-}
@@ -48,12 +49,12 @@ services:
     image: python:3.12-slim
     working_dir: /app
     volumes:
-      - .:/app
+      - ..:/app                              # mount the whole repo so server.py is reachable
     depends_on:
       - broker
     command: >
       sh -c "pip install --quiet aiohttp websockets &&
-             python3 worker.py
+             python3 hosted/worker.py
              --broker ws://broker:8787/v1/workers/connect
              --key $${GW}
              --name compose-worker"

@@ -1,20 +1,22 @@
 # Fly.io deploy config for the gstack broker.
 #
-# Setup:
-#   fly launch --no-deploy --name gstack-broker
-#   fly postgres create --name gstack-db          # or attach Supabase via secret
+# Run from the REPO ROOT (not from hosted/broker/), because the
+# Dockerfile pulls in ../../data/ alongside the broker source:
+#
+#   fly launch --no-deploy --name gstack-broker --config hosted/broker/fly.toml
+#   fly postgres create --name gstack-db
 #   fly postgres attach --app gstack-broker gstack-db
-#   fly secrets set \
+#   fly secrets set --app gstack-broker \
 #     CLERK_JWKS_URL="https://<your>.clerk.accounts.dev/.well-known/jwks.json" \
 #     CLERK_ISSUER="https://<your>.clerk.accounts.dev" \
 #     GSTACK_POOL_AGENTCALL_KEY="ak_ac_..."
-#   fly deploy
+#   fly deploy --config hosted/broker/fly.toml --dockerfile hosted/broker/Dockerfile
 
 app           = "gstack-broker"
 primary_region = "iad"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "hosted/broker/Dockerfile"
 
 [env]
   PYTHONUNBUFFERED = "1"

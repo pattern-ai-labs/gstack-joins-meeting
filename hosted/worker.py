@@ -94,13 +94,22 @@ def server_alive(port: int) -> bool:
 
 def ensure_server(port: int, log_path: Path) -> Optional[subprocess.Popen]:
     """Spawn server.py if it isn't already running on the given port.
-    Returns the Popen for cleanup, or None if an existing server is reused."""
+    Returns the Popen for cleanup, or None if an existing server is reused.
+
+    The worker lives at <repo>/hosted/worker.py; server.py lives at the
+    repo root. We probe a few likely locations so the same code works
+    for a repo checkout, a docker image, and the installer default."""
     if server_alive(port):
         emit({"type": "info", "message": f"reusing server on :{port}"})
         return None
-    server = HERE / "server.py"
-    if not server.is_file():
-        emit({"type": "error", "message": f"server.py not found at {server}"})
+    candidates = [
+        HERE.parent / "server.py",                              # repo checkout
+        HERE / "server.py",                                     # next to worker
+        Path.home() / "gstack-joins-meeting" / "server.py",     # installer default
+    ]
+    server = next((p for p in candidates if p.is_file()), None)
+    if server is None:
+        emit({"type": "error", "message": f"server.py not found; tried {[str(p) for p in candidates]}"})
         sys.exit(2)
     env = os.environ.copy()
     env["PORT"] = str(port)

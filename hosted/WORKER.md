@@ -13,7 +13,7 @@ It's modeled after AgentCall's `agentcall-demo-worker` pattern.
 
 ## What the worker does
 
-`worker.py` is a **dumb bidirectional bridge** — ~250 lines of stdlib +
+`hosted/worker.py` is a **dumb bidirectional bridge** — ~250 lines of stdlib +
 `websockets`. It has no LLM. All decision-making lives in the Claude
 Code session running alongside it.
 

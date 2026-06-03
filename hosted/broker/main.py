@@ -469,17 +469,30 @@ def _assignment_safe(row: dict) -> dict:
 
 _SPECIALISTS_CACHE: list[dict] = []
 def _load_specialists_data() -> list[dict]:
-    """Load data/specialists.json once and cache for the process lifetime."""
+    """Load data/specialists.json once and cache for the process lifetime.
+
+    The broker now lives at <repo>/hosted/broker/. The canonical data
+    file lives at <repo>/data/specialists.json. We try a few layouts so
+    the same code works for: a repo checkout (hosted/broker/main.py →
+    ../../data/), a docker image (data/ copied next to broker/), and
+    edge cases where someone moves things around."""
     global _SPECIALISTS_CACHE
     if _SPECIALISTS_CACHE:
         return _SPECIALISTS_CACHE
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    path = os.path.join(repo_root, "data", "specialists.json")
-    try:
-        with open(path, encoding="utf-8") as f:
-            _SPECIALISTS_CACHE = json.load(f)
-    except Exception:
-        _SPECIALISTS_CACHE = []
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(here, "..", "..", "data", "specialists.json"),  # repo checkout
+        os.path.join(here, "..",       "data", "specialists.json"),  # broker_dir/../data
+        os.path.join(here,             "data", "specialists.json"),  # docker (data next to broker)
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    _SPECIALISTS_CACHE = json.load(f)
+                break
+            except Exception:
+                pass
     return _SPECIALISTS_CACHE
 
 
