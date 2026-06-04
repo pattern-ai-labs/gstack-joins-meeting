@@ -153,32 +153,35 @@ function GarryRibbon() {
   return (
     <section className="border-y border-[var(--color-border)] bg-[var(--color-bg-soft)]">
       <div className="max-w-5xl mx-auto px-6 py-4 flex flex-wrap items-center justify-center gap-3 text-[13px] text-center">
-        <span className="text-[var(--color-fg-soft)]">
-          Built on <strong className="text-[var(--color-fg)]">gstack</strong>, open-sourced by
-        </span>
+        <span className="text-[var(--color-fg-soft)] shrink-0">Built on</span>
         <a
-          href="https://x.com/garrytan"
+          href="https://github.com/garrytan/gstack"
           target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-2 chip chip-active hover:scale-[1.02] transition"
+          title="gstack — the slash-command persona library by Garry Tan (President & CEO, YC)"
         >
-          <GarryAvatar />
-          <span><strong>Garry Tan</strong> <span className="text-[11px] opacity-70">@garrytan · President & CEO, YC</span></span>
+          <span
+            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+            style={{ background: "#ff6b2b", color: "#fff" }}
+          >G</span>
+          <span><strong>gstack</strong> <span className="text-[11px] opacity-70">by @garrytan</span></span>
         </a>
-        <span className="text-[var(--color-fg-soft)]">— thank you for the personas.</span>
+        <span className="text-[var(--color-fg-soft)] shrink-0">+</span>
+        <a
+          href="https://agentcall.dev"
+          target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 chip chip-active hover:scale-[1.02] transition"
+          title="AgentCall — the meeting-bot platform by Pattern AI Labs"
+        >
+          <span
+            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+            style={{ background: "#c8ff3a", color: "#0a0b07" }}
+          >A</span>
+          <span><strong>AgentCall</strong> <span className="text-[11px] opacity-70">by Pattern AI Labs</span></span>
+        </a>
+        <span className="text-[var(--color-fg-soft)] shrink-0">— thank you both.</span>
       </div>
     </section>
-  );
-}
-
-function GarryAvatar() {
-  // a stylized monogram in YC orange — avoids hot-linking a photo
-  return (
-    <span
-      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-      style={{ background: "#ff6b2b", color: "#fff" }}
-    >
-      G
-    </span>
   );
 }
 

@@ -13,7 +13,9 @@ import { Sidebar } from "./Sidebar";
  */
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLanding = pathname === "/landing";
+  // /landing and any sub-route (e.g. /landing/v2 for the sketchbook
+  // variant) render full-bleed without the app sidebar.
+  const isLanding = pathname === "/landing" || pathname.startsWith("/landing/");
   if (isLanding) return <>{children}</>;
   return (
     <>
