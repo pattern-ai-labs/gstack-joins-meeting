@@ -84,7 +84,31 @@ export function Sidebar() {
       <SignedIn>
         <UserPill />
       </SignedIn>
+
+      <BrokerStatus />
     </aside>
+  );
+}
+
+/* Tiny dot + label at the very bottom of the sidebar. Polls the broker's
+ * /healthz every 10s and shows live/down. Free debugging signal for
+ * visitors when the demo isn't responding — and a tiny "the demo is on"
+ * confirmation when it is. */
+function BrokerStatus() {
+  const { data, error, isLoading } = useApiSWR<{ ok: boolean }>(
+    "/healthz",
+    { refreshInterval: 10000, allowSignedOut: true },
+  );
+  const up = !error && data?.ok === true;
+  const checking = isLoading && !data && !error;
+
+  return (
+    <div className="px-5 pb-3 pt-1 flex items-center gap-2 text-[10.5px] mono text-[var(--color-muted)]">
+      <span className={`dot ${checking ? "dot-mute" : up ? "dot-ok pulse" : "dot-bad"}`} />
+      <span className="uppercase tracking-wider">
+        {checking ? "checking…" : up ? "demo live" : "demo offline"}
+      </span>
+    </div>
   );
 }
 
