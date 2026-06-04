@@ -206,16 +206,27 @@ export function DispatchPanel() {
       </section>
 
       {/* FLOATING DISPATCH BAR — slides up when anything is selected.
-          Lives outside the .surface sections so it floats over the page. */}
+          Uses `inset-x-0` + `mx-auto` so it centers on the CONTENT area
+          (offset right by the 224px sidebar on lg+), not the viewport
+          midpoint. Sized large enough to be the obvious primary action. */}
       <div
-        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-out ${
-          picked.size > 0 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6 pointer-events-none"
+        className={`fixed bottom-6 inset-x-0 lg:left-56 z-40 flex justify-center px-4 pointer-events-none transition-all duration-300 ease-out ${
+          picked.size > 0 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
         }`}
       >
-        <div className="glass rounded-full pl-5 pr-2 py-2 flex items-center gap-4 shadow-[0_8px_30px_rgba(0,0,0,0.4)] border-[var(--color-border-2)]">
-          <span className="text-[12.5px] font-medium">
-            <span className="text-[var(--color-accent)] mono">{picked.size}</span>
-            <span className="text-[var(--color-fg-soft)] ml-1.5">selected</span>
+        <div
+          className="rounded-full pl-6 pr-2 py-2 flex items-center gap-5 shadow-[0_12px_40px_rgba(0,0,0,0.55)] border border-[var(--color-border-2)] pointer-events-auto"
+          style={{
+            // Mostly opaque (95% panel) instead of the heavier-glass 70%;
+            // keeps the dark-mode feel but reads as a solid CTA.
+            background: "rgba(19, 22, 27, 0.95)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+          }}
+        >
+          <span className="text-[13px] font-medium">
+            <span className="text-[var(--color-accent)] mono text-[15px]">{picked.size}</span>
+            <span className="text-[var(--color-fg-soft)] ml-2">selected</span>
           </span>
           <button
             className="text-[12px] text-[var(--color-muted)] hover:text-[var(--color-fg)]"
@@ -224,7 +235,7 @@ export function DispatchPanel() {
             Clear
           </button>
           <button
-            className="btn btn-primary px-5 py-2 text-[13px] rounded-full"
+            className="btn btn-primary px-6 py-2.5 text-[14px] rounded-full"
             disabled={pending || !meetUrl.trim()}
             onClick={dispatch}
             title={!meetUrl.trim() ? "Paste a meeting URL above first" : undefined}
