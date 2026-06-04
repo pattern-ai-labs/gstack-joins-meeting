@@ -57,13 +57,30 @@ async def run_migrations() -> None:
 # users
 
 async def upsert_user(user_id: str, email: Optional[str], name: Optional[str]) -> dict:
-    """Idempotent user sync — first user in the system becomes admin."""
+    """Idempotent user sync. Admin assignment rules (first matching wins):
+
+      1. If email is in GSTACK_ADMIN_EMAILS (comma-separated env var) →
+         always admin, even on re-login. This is the durable way for the
+         operator to lock their account as admin regardless of signup
+         order or sign-up-from-another-device shenanigans.
+      2. Else if no users exist yet → first signup gets admin (bootstrap
+         convenience for a fresh DB without GSTACK_ADMIN_EMAILS set).
+      3. Else → member.
+
+    Re-login of an existing user does NOT downgrade them — role only
+    upgrades from the email allow-list, never downgrades to member.
+    """
+    import os
+    allow = {e.strip().lower() for e in os.environ.get("GSTACK_ADMIN_EMAILS", "").split(",") if e.strip()}
+    is_email_admin = bool(email) and email.strip().lower() in allow
+
     pool = await init_pool()
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute("SELECT COUNT(*) AS n FROM users")
             row = await cur.fetchone()
-            initial_role = "admin" if (row or {}).get("n", 0) == 0 else "member"
+            bootstrap_admin = (row or {}).get("n", 0) == 0
+            initial_role = "admin" if (is_email_admin or bootstrap_admin) else "member"
             await cur.execute(
                 """
                 INSERT INTO users (id, email, display_name, role, last_seen_at)
@@ -71,10 +88,16 @@ async def upsert_user(user_id: str, email: Optional[str], name: Optional[str]) -
                 ON CONFLICT (id) DO UPDATE SET
                     email        = COALESCE(EXCLUDED.email, users.email),
                     display_name = COALESCE(EXCLUDED.display_name, users.display_name),
+                    -- Upgrade member → admin if the email is allow-listed,
+                    -- but never downgrade an existing admin to member.
+                    role         = CASE
+                                     WHEN %s::boolean THEN 'admin'
+                                     ELSE users.role
+                                   END,
                     last_seen_at = now()
                 RETURNING *
                 """,
-                (user_id, email, name, initial_role),
+                (user_id, email, name, initial_role, is_email_admin),
             )
             user = await cur.fetchone()
         await conn.commit()

@@ -49,9 +49,11 @@ function Explainer() {
       <h2 className="font-semibold text-[15px]">What is a brain?</h2>
       <ul className="text-[13.5px] text-[var(--color-fg-soft)] space-y-2 list-disc list-inside leading-relaxed">
         <li>
-          A brain is a <strong className="text-[var(--color-fg)]">Claude Code session running on your laptop</strong>.
-          When a bot in your meeting needs to reply, the brain reads the transcript and writes the
-          reply.
+          A brain is a <strong className="text-[var(--color-fg)]">coding agent session running on your laptop</strong>
+          — <span className="mono text-[12px]">Claude Code</span>, <span className="mono text-[12px]">Codex</span>,
+          <span className="mono text-[12px]"> Cursor</span>, or any agent that can spawn a subprocess and read stdout.
+          When a bot in your meeting needs to reply, your brain reads the transcript and writes the reply
+          in-character.
         </li>
         <li>
           The brain only sees what <strong className="text-[var(--color-fg)]">you</strong> dispatch through it.
@@ -156,8 +158,11 @@ GSTACK_BROKER_URL=wss://gstack-broker.fly.dev/v1/workers/connect \\
 {install}
           </pre>
           <p className="text-[11.5px] text-[var(--color-muted)] mt-3 leading-snug">
-            Make sure you have <a className="underline" href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a> installed and signed in.
-            Your Claude session in that terminal becomes the brain.
+            Make sure your coding agent of choice (
+            <a className="underline" href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>,
+            <a className="underline ml-1" href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex</a>,
+            <a className="underline ml-1" href="https://cursor.com" target="_blank" rel="noopener">Cursor</a>)
+            is installed and signed in. The session running in that terminal becomes the brain.
           </p>
         </div>
       )}

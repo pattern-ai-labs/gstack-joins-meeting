@@ -83,11 +83,11 @@ export function PoolBusyModal({
             What is a brain?
           </summary>
           <p className="mt-2 leading-snug">
-            A "brain" is a Claude Code session running on a real laptop. When you
-            dispatch a specialist, the brain reads the meeting transcript and writes
-            in-character replies that the bot speaks. The demo pool runs on the
-            maintainer's laptop; bringing your own brain just means running the
-            installer + a worker daemon — about 60 seconds.
+            A "brain" is your coding-agent session (Claude Code, Codex, Cursor, etc.)
+            running on a real laptop. When you dispatch a specialist, your brain reads
+            the meeting transcript and writes in-character replies that the bot speaks.
+            The demo pool runs on the maintainer's laptop; bringing your own brain just
+            means running the installer + the daemon — about 60 seconds.
           </p>
         </details>
       </div>
