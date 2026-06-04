@@ -38,6 +38,39 @@ export function DispatchPanel() {
   const [category, setCategory] = useState("All");
   const [pending, setPending] = useState(false);
   const [poolBusyOpen, setPoolBusyOpen] = useState(false);
+  const [newMeetHelper, setNewMeetHelper] = useState(false);
+
+  // Open meet.new in a new tab so Google provisions a fresh meeting,
+  // then surface a helper card with a one-click paste so the user
+  // doesn't have to manually find and paste the URL after they get back.
+  function startNewMeet() {
+    window.open("https://meet.new", "_blank", "noopener,noreferrer");
+    setNewMeetHelper(true);
+  }
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const trimmed = text.trim();
+      if (/^https?:\/\/(meet\.google\.com|zoom\.us|.*\.zoom\.us|teams\.(microsoft|live)\.com)/.test(trimmed)) {
+        setMeetUrl(trimmed);
+        setNewMeetHelper(false);
+        toast.push({ kind: "ok", title: "Meeting URL pasted" });
+      } else {
+        toast.push({
+          kind: "err",
+          title: "Clipboard doesn't look like a meeting URL",
+          body: "Copy the URL from the Meet/Zoom/Teams tab address bar, then click Paste again.",
+        });
+      }
+    } catch {
+      toast.push({
+        kind: "err",
+        title: "Couldn't read clipboard",
+        body: "Your browser blocked clipboard access. Paste the URL manually into the field above.",
+      });
+    }
+  }
 
   const filtered = useMemo(() => {
     return all.filter((s) => category === "All" || s.category === category);
@@ -121,14 +154,14 @@ export function DispatchPanel() {
 
         <div className="flex items-baseline justify-between mb-1.5">
           <label className="label-cap">Meeting URL</label>
-          <a
-            href="https://meet.new"
-            target="_blank" rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={startNewMeet}
             className="text-[11px] text-[var(--color-accent)] hover:underline underline-offset-2"
-            title="Opens meet.new in a new tab — it creates a fresh Google Meet room. Copy the URL from the address bar, then paste here."
+            title="Opens meet.new in a new tab — once you join the meeting, copy the URL from the address bar and we'll auto-paste it here."
           >
             Don't have a link? Start one →
-          </a>
+          </button>
         </div>
         <div className="relative">
           <input
@@ -140,6 +173,28 @@ export function DispatchPanel() {
             {meetUrl.trim() ? (meetLooksValid ? "valid" : "bad host") : "empty"}
           </span>
         </div>
+        {newMeetHelper && (
+          <div className="mt-2 surface bg-[var(--color-bg-soft)] p-3 text-[12px] anim-fade flex items-center gap-3">
+            <span className="dot dot-warn pulse shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium">Google Meet opened in a new tab.</div>
+              <div className="text-[var(--color-muted)] mt-0.5">
+                Once you've joined the room, copy the URL from the address bar — then click the button.
+              </div>
+            </div>
+            <button
+              className="btn btn-primary text-[11.5px] py-1.5 px-3 shrink-0"
+              onClick={pasteFromClipboard}
+            >
+              Paste from clipboard
+            </button>
+            <button
+              className="text-[var(--color-muted)] hover:text-[var(--color-fg)] text-[16px] leading-none"
+              onClick={() => setNewMeetHelper(false)}
+              aria-label="Dismiss"
+            >×</button>
+          </div>
+        )}
 
         <div className="mt-4">
           {!showBrief ? (
