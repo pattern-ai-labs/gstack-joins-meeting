@@ -29,3 +29,6 @@ __pycache__/
 # Local override / experimentation
 *.local
 *.local.*
+
+# session-local IPC files for the Dictator voice widget
+.dictator/
