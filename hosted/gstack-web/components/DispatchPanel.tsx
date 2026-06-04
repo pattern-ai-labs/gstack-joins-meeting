@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApi, useApiSWR } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { SpecialistCard } from "./SpecialistCard";
+import { PoolBusyModal } from "./PoolBusyModal";
 import type { Specialist } from "@/lib/types";
 
 // Curated team presets — mirrors data/teams.json on the backend.
@@ -43,6 +44,7 @@ export function DispatchPanel() {
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState(false);
+  const [poolBusyOpen, setPoolBusyOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -88,12 +90,19 @@ export function DispatchPanel() {
       setPicked(new Set());
       refreshWorkers(); refreshAssignments();
     } catch (e: unknown) {
-      const err = e as { message?: string; body?: { hint?: string; error?: string } };
-      toast.push({
-        kind: "err",
-        title: "Dispatch failed",
-        body: err.body?.hint || err.body?.error || err.message,
-      });
+      const err = e as { status?: number; message?: string; body?: { hint?: string; error?: string } };
+      // Pool-is-busy: the broker returns 503 with error="demo_busy".
+      // Render the friendly modal instead of a generic error toast so
+      // the user gets a real way forward (retry, or bring their own brain).
+      if (err.status === 503 && err.body?.error === "demo_busy") {
+        setPoolBusyOpen(true);
+      } else {
+        toast.push({
+          kind: "err",
+          title: "Dispatch failed",
+          body: err.body?.hint || err.body?.error || err.message,
+        });
+      }
     } finally {
       setPending(false);
     }
@@ -103,6 +112,17 @@ export function DispatchPanel() {
 
   return (
     <div className="space-y-8">
+      <PoolBusyModal
+        open={poolBusyOpen}
+        onClose={() => setPoolBusyOpen(false)}
+        onRetry={() => {
+          // Auto-retry from inside the modal: re-trigger the dispatch
+          // with the same selection. If it succeeds the modal closes
+          // (via the catch branch above no longer firing).
+          setPoolBusyOpen(false);
+          dispatch();
+        }}
+      />
       {/* HERO */}
       <section className="surface p-6 anim-up">
         <div className="flex items-end gap-3 mb-1">
