@@ -42,18 +42,12 @@ export function DispatchPanel() {
   }, [mode]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState("All");
-  const [query, setQuery] = useState("");
   const [pending, setPending] = useState(false);
   const [poolBusyOpen, setPoolBusyOpen] = useState(false);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return all.filter((s) => {
-      if (category !== "All" && s.category !== category) return false;
-      if (!q) return true;
-      return [s.id, s.name, s.role, s.description, s.card_name, s.desc_card].some((f) => (f || "").toLowerCase().includes(q));
-    });
-  }, [all, category, query]);
+    return all.filter((s) => category === "All" || s.category === category);
+  }, [all, category]);
 
   function toggle(id: string) {
     setPicked((cur) => {
@@ -220,11 +214,7 @@ export function DispatchPanel() {
       <section>
         <div className="flex items-baseline justify-between mb-3">
           <h2 className="text-[15px] font-semibold">Specialists</h2>
-          <input
-            value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search role, name, description…"
-            className="max-w-xs !py-1.5 !px-3 text-[12px]"
-          />
+          <span className="text-[12px] text-[var(--color-muted)]">{filtered.length} of {all.length}</span>
         </div>
         <div className="flex gap-1.5 flex-wrap mb-4">
           {CATEGORIES.map((c) => (
