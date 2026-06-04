@@ -17,14 +17,11 @@ export default function SpecialistsPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-8 py-8 anim-fade">
-      <header className="mb-6 flex items-baseline justify-between">
-        <div>
-          <h1 className="text-[26px] font-semibold tracking-tight">Specialists</h1>
-          <p className="text-[13px] text-[var(--color-fg-soft)] mt-1">
-            The full roster — 19 personas, each with a distinct voice and avatar. Same source of truth as <code className="mono">data/specialists.json</code>.
-          </p>
-        </div>
-        <span className="text-[12px] text-[var(--color-muted)] shrink-0 ml-4">{filtered.length} of {all.length}</span>
+      <header className="mb-6">
+        <h1 className="text-[26px] font-semibold tracking-tight">Specialists</h1>
+        <p className="text-[13px] text-[var(--color-fg-soft)] mt-1">
+          The full roster — 19 personas, each with a distinct voice and avatar. Same source of truth as <code className="mono">data/specialists.json</code>.
+        </p>
       </header>
 
       <div className="flex gap-1.5 flex-wrap mb-4">

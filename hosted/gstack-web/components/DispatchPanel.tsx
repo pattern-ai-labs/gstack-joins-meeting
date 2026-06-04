@@ -212,10 +212,7 @@ export function DispatchPanel() {
 
       {/* SPECIALISTS */}
       <section>
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-[15px] font-semibold">Specialists</h2>
-          <span className="text-[12px] text-[var(--color-muted)]">{filtered.length} of {all.length}</span>
-        </div>
+        <h2 className="text-[15px] font-semibold mb-3">Specialists</h2>
         <div className="flex gap-1.5 flex-wrap mb-4">
           {CATEGORIES.map((c) => (
             <button
