@@ -92,32 +92,39 @@ function UserPill() {
   const { data: meResp } = useApiSWR<{ user: User }>("/api/me");
   const u = meResp?.user;
   if (!u) return null;
-  const used = u.minutes_used, quota = u.quota_minutes;
-  const over = quota > 0 && used > quota;
-  const pct = Math.min(100, Math.round((used / Math.max(1, quota)) * 100));
+  // Prefer real display name (from Clerk); fall back to the local part of
+  // the email, then "you". Avoids showing internal user-id ("user_dev_local")
+  // or raw email when a friendlier label exists.
+  const displayName =
+    u.display_name?.trim() ||
+    (u.email?.includes("@") ? u.email.split("@")[0] : null) ||
+    "you";
   return (
-    <div className="m-3 p-3 surface text-[12px] space-y-2">
-      <div className="flex items-center gap-2">
-        <UserButton />
+    <>
+      <a
+        href="https://github.com/pattern-ai-labs/gstack-joins-meeting"
+        target="_blank" rel="noopener noreferrer"
+        className="mx-3 mb-2 surface px-3 py-2.5 text-[12px] flex items-center gap-2 hover:bg-[var(--color-panel-2)] transition group"
+        title="The whole project is open source — clone + run with your own Claude session"
+      >
+        <span className="text-[14px]">⌥</span>
         <div className="flex-1 min-w-0">
-          <div className="truncate font-medium">{u.display_name || u.email || "you"}</div>
-          <div className="text-[10px] text-[var(--color-muted)] truncate">{u.email}</div>
+          <div className="font-medium">Run gstack locally</div>
+          <div className="text-[10px] text-[var(--color-muted)]">open source · MIT</div>
         </div>
-        {u.role === "admin" && <span className="badge badge-accent">admin</span>}
-      </div>
-      <div>
-        <div className="flex items-center justify-between text-[11px] text-[var(--color-muted)] mb-1">
-          <span>{over ? <span className="text-[var(--color-bad)]">over quota</span> : "usage"}</span>
-          <span className="mono">{used} / {quota} min</span>
-        </div>
-        <div className="h-1 rounded-full bg-[var(--color-border)] overflow-hidden">
-          <div
-            className={`h-full transition-all ${over ? "bg-[var(--color-bad)]" : "bg-[var(--color-accent)]"}`}
-            style={{ width: `${pct}%` }}
-          />
+        <span className="text-[12px] text-[var(--color-muted)] group-hover:text-[var(--color-fg)]">→</span>
+      </a>
+      <div className="m-3 p-3 surface text-[12px]">
+        <div className="flex items-center gap-2">
+          <UserButton />
+          <div className="flex-1 min-w-0">
+            <div className="truncate font-medium">{displayName}</div>
+            {u.email && <div className="text-[10px] text-[var(--color-muted)] truncate">{u.email}</div>}
+          </div>
+          {u.role === "admin" && <span className="badge badge-accent">admin</span>}
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

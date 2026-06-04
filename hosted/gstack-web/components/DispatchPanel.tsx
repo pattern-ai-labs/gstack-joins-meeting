@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useApi, useApiSWR } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { SpecialistCard } from "./SpecialistCard";
@@ -30,16 +30,10 @@ export function DispatchPanel() {
   const [meetUrl, setMeetUrl] = useState("");
   const [brief, setBrief] = useState("");
   const [showBrief, setShowBrief] = useState(false);
-  const [mode, setMode] = useState<"avatar" | "audio">("avatar");
-  // Restore the last-used mode from localStorage so a user who switched
-  // to audio for cost/latency stays on audio after a refresh.
-  useEffect(() => {
-    const saved = typeof window !== "undefined" && window.localStorage.getItem("gstack:mode");
-    if (saved === "avatar" || saved === "audio") setMode(saved);
-  }, []);
-  useEffect(() => {
-    if (typeof window !== "undefined") window.localStorage.setItem("gstack:mode", mode);
-  }, [mode]);
+  // Avatar mode is the default; the audio-only toggle was removed for
+  // visual simplicity (it remains supported on the broker if a caller
+  // explicitly passes mode: "audio").
+  const mode = "avatar" as const;
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState("All");
   const [pending, setPending] = useState(false);
@@ -163,31 +157,6 @@ export function DispatchPanel() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          <div className="flex bg-[var(--color-panel-2)] rounded-lg p-0.5 border border-[var(--color-border)]">
-            {(["avatar", "audio"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`text-[12px] px-3 py-1.5 rounded-md transition ${
-                  mode === m ? "bg-[var(--color-panel)] text-[var(--color-fg)]" : "text-[var(--color-muted)] hover:text-[var(--color-fg)]"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <span className="text-[11px] text-[var(--color-muted)]">
-            {mode === "avatar" ? "voice + 3D avatar (slower join)" : "voice only (faster)"}
-          </span>
-          <div className="ml-auto flex items-center gap-3">
-            <span className="text-[12px] text-[var(--color-muted)]">{picked.size} selected</span>
-            <button className="btn btn-outline text-[12px]" disabled={picked.size === 0} onClick={clear}>Clear</button>
-            <button className="btn btn-primary px-5 py-2.5 text-[13px]" disabled={pending || !meetUrl.trim() || picked.size === 0} onClick={dispatch}>
-              {pending ? "Dispatching…" : `Dispatch ${picked.size || ""} →`}
-            </button>
-          </div>
-        </div>
       </section>
 
       {/* TEAM PRESETS */}
@@ -227,13 +196,43 @@ export function DispatchPanel() {
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-[13px] text-[var(--color-muted)]">No specialists match the filter.</div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 pb-24">
+            {/* pb-24 so the floating dispatch bar doesn't cover the last row */}
             {filtered.map((s) => (
               <SpecialistCard key={s.id} s={s} selected={picked.has(s.id)} onToggle={() => toggle(s.id)} />
             ))}
           </div>
         )}
       </section>
+
+      {/* FLOATING DISPATCH BAR — slides up when anything is selected.
+          Lives outside the .surface sections so it floats over the page. */}
+      <div
+        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-out ${
+          picked.size > 0 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6 pointer-events-none"
+        }`}
+      >
+        <div className="glass rounded-full pl-5 pr-2 py-2 flex items-center gap-4 shadow-[0_8px_30px_rgba(0,0,0,0.4)] border-[var(--color-border-2)]">
+          <span className="text-[12.5px] font-medium">
+            <span className="text-[var(--color-accent)] mono">{picked.size}</span>
+            <span className="text-[var(--color-fg-soft)] ml-1.5">selected</span>
+          </span>
+          <button
+            className="text-[12px] text-[var(--color-muted)] hover:text-[var(--color-fg)]"
+            onClick={clear}
+          >
+            Clear
+          </button>
+          <button
+            className="btn btn-primary px-5 py-2 text-[13px] rounded-full"
+            disabled={pending || !meetUrl.trim()}
+            onClick={dispatch}
+            title={!meetUrl.trim() ? "Paste a meeting URL above first" : undefined}
+          >
+            {pending ? "Dispatching…" : `Dispatch →`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
