@@ -26,7 +26,7 @@ export function Sidebar() {
   const isAdmin = meResp?.user?.role === "admin";
 
   return (
-    <aside className="w-56 shrink-0 h-screen sticky top-0 border-r border-[var(--color-border)] flex flex-col">
+    <aside className="hidden md:flex w-56 shrink-0 h-screen sticky top-0 border-r border-[var(--color-border)] flex-col">
       <div className="px-5 pt-5 pb-6">
         <Link href="/" className="flex items-center gap-2.5 group">
           <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-fg)] flex items-center justify-center font-bold text-sm shadow-[0_0_0_3px_var(--color-accent-soft)]">G</span>

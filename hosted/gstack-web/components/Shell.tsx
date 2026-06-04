@@ -2,6 +2,7 @@
 import { usePathname } from "next/navigation";
 import { SignedIn, SignedOut } from "@/lib/auth";
 import { Sidebar } from "./Sidebar";
+import { MobileHeader } from "./MobileHeader";
 
 /**
  * Layout shell that decides whether to show the app sidebar or hand
@@ -31,9 +32,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
 function WithSidebar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 min-w-0">{children}</div>
-    </div>
+    <>
+      <MobileHeader />
+      <div className="flex min-h-screen">
+        <Sidebar />
+        <div className="flex-1 min-w-0">{children}</div>
+      </div>
+    </>
   );
 }

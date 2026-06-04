@@ -35,11 +35,12 @@ export function DispatchPanel() {
   // explicitly passes mode: "audio").
   const mode = "avatar" as const;
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  // First-visit hint: auto-pick the Founding Team so a brand-new
-  // visitor doesn't have to figure out which specialists to choose
-  // before the demo button lights up. Marker is in localStorage so we
-  // only do this once per browser; users who clear their selection
-  // later don't get reset.
+  const [showHint, setShowHint] = useState(false);
+  // First-visit auto-pick the Founding Team so a brand-new visitor
+  // doesn't have to figure out which specialists to choose. Hint banner
+  // appears with the auto-pick to telegraph what just happened; it
+  // dismisses on any interaction (paste / toggle / X). LocalStorage
+  // markers so neither fires again on subsequent visits.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.localStorage.getItem("gstack:starter-picked")) return;
@@ -47,8 +48,15 @@ export function DispatchPanel() {
     if (founding) {
       setPicked(new Set(founding.specs));
       window.localStorage.setItem("gstack:starter-picked", "1");
+      setShowHint(true);
     }
   }, []);
+  const dismissHint = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("gstack:hint-dismissed", "1");
+    }
+    setShowHint(false);
+  };
   const [category, setCategory] = useState("All");
   const [pending, setPending] = useState(false);
   const [poolBusyOpen, setPoolBusyOpen] = useState(false);
@@ -158,6 +166,27 @@ export function DispatchPanel() {
           dispatch();
         }}
       />
+      {showHint && (
+        <div
+          className="card flex items-center gap-3 px-4 py-3 anim-up"
+          style={{
+            background: "var(--color-accent-soft)",
+            borderColor: "var(--color-accent-ring)",
+          }}
+        >
+          <span className="text-[18px]">✨</span>
+          <div className="flex-1 text-[13px]">
+            <strong className="text-[var(--color-fg)]">3 specialists pre-selected for you</strong>
+            <span className="text-[var(--color-fg-soft)]"> — the Founding Team. Paste a Meet URL below and hit Dispatch.</span>
+          </div>
+          <button
+            onClick={dismissHint}
+            className="text-[var(--color-muted)] hover:text-[var(--color-fg)] text-[18px] leading-none"
+            aria-label="Dismiss"
+          >×</button>
+        </div>
+      )}
+
       {/* HERO */}
       <section className="surface p-6 anim-up">
         <div className="flex items-end gap-3 mb-1 flex-wrap">
