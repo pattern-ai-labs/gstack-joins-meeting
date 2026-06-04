@@ -5,15 +5,19 @@ import { SignedIn, SignedOut, UserButton } from "@/lib/auth";
 import { useApiSWR } from "@/lib/api";
 import type { User } from "@/lib/types";
 
-const NAV = [
+// Member nav — visible to everyone signed in. Just the action surface.
+const MEMBER_NAV = [
   { href: "/",            label: "Dashboard",   icon: HomeIcon },
   { href: "/specialists", label: "Specialists", icon: GridIcon },
-  { href: "/calls",       label: "Calls",       icon: CallIcon },
-  { href: "/workers",     label: "Workers",     icon: ChipIcon },
 ];
 
+// Admin nav — hidden from members. Internal management surface for the
+// operator running the demo pool. "Brains" is workers; Calls is the
+// audit log; Admin is users + metrics.
 const ADMIN_NAV = [
-  { href: "/admin",       label: "Admin",       icon: ShieldIcon },
+  { href: "/calls",   label: "Calls",   icon: CallIcon },
+  { href: "/workers", label: "Brains",  icon: ChipIcon },
+  { href: "/admin",   label: "Admin",   icon: ShieldIcon },
 ];
 
 export function Sidebar() {
@@ -33,7 +37,7 @@ export function Sidebar() {
 
       <nav className="px-3 flex-1 space-y-0.5">
         <SignedIn>
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {MEMBER_NAV.map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
               <Link

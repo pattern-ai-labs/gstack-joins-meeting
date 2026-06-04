@@ -24,7 +24,7 @@ export function ActiveCallsRail() {
         method: "POST",
         body: JSON.stringify(worker_id ? { worker_id } : {}),
       });
-      toast.push({ kind: "ok", title: "Recalled", body: `${r.recalled} worker${r.recalled === 1 ? "" : "s"} freed` });
+      toast.push({ kind: "ok", title: "Recalled", body: `${r.recalled} brain${r.recalled === 1 ? "" : "s"} freed` });
       refreshWorkers(); refreshAssignments();
     } catch (e) {
       toast.push({ kind: "err", title: "Recall failed", body: (e as Error).message });
@@ -36,7 +36,7 @@ export function ActiveCallsRail() {
       <div className="px-4 py-3 border-b border-[var(--color-border)] flex items-center justify-between">
         <div>
           <div className="text-[13px] font-semibold">Now in meeting</div>
-          <div className="text-[11px] text-[var(--color-muted)]">{active.length} active · {workers.length} worker{workers.length === 1 ? "" : "s"}</div>
+          <div className="text-[11px] text-[var(--color-muted)]">{active.length} active · {workers.length} brain{workers.length === 1 ? "" : "s"}</div>
         </div>
         {active.length > 0 && (
           <button className="btn btn-danger text-[11px] py-1.5 px-2.5" onClick={() => recall()}>Recall all</button>
@@ -45,15 +45,15 @@ export function ActiveCallsRail() {
 
       <div className="flex-1 scroll-y px-4 py-3 space-y-3 max-h-[60vh] xl:max-h-none">
         {active.length === 0 && workers.length === 0 && (
-          <EmptyRail title="No workers online" body="Start a worker daemon on a machine you own. Open Workers → mint a key → run the one-liner." />
+          <EmptyRail title="No brains online" body="Start a brain on a machine you own. Open Brains → create a brain → run the one-liner." />
         )}
         {active.length === 0 && workers.length > 0 && (
-          <EmptyRail title="No active calls" body={`${workers.filter((w) => w.state === "idle").length} idle worker(s) ready. Dispatch from the main panel.`} />
+          <EmptyRail title="No active calls" body={`${workers.filter((w) => w.state === "idle").length} idle brain(s) ready. Dispatch from the main panel.`} />
         )}
         {active.map((a) => <ActiveCallCard key={a.id} a={a} onRecall={recall} />)}
         {workers.length > 0 && (
           <div className="pt-2 mt-3 border-t border-[var(--color-border)] space-y-2">
-            <div className="label-cap mb-1">Workers</div>
+            <div className="label-cap mb-1">Brains</div>
             {workers.map((w) => <WorkerRow key={w.id} w={w} />)}
           </div>
         )}

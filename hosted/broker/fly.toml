@@ -13,10 +13,13 @@
 #   fly deploy --config hosted/broker/fly.toml --dockerfile hosted/broker/Dockerfile
 
 app           = "gstack-broker"
-primary_region = "iad"
+primary_region = "syd"  # Sydney — matches the AP region of the Postgres + closest to AP users
 
 [build]
-  dockerfile = "hosted/broker/Dockerfile"
+  # Resolved relative to this fly.toml. Build CONTEXT is overridden on the
+  # CLI to be the repo root (via `--image-label` / `--dockerfile` from
+  # repo-root cwd) so the Dockerfile can COPY hosted/broker/ + data/.
+  dockerfile = "Dockerfile"
 
 [env]
   PYTHONUNBUFFERED = "1"

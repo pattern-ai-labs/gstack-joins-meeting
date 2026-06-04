@@ -103,15 +103,36 @@ def _hash_key(key: str) -> str:
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
 
-def pick_idle_worker_for(user_id: str, is_admin: bool) -> Optional[Worker]:
-    """Pick an idle worker the user owns. Admins can use any idle worker
-    (the implicit pool)."""
-    pool = [w for w in WORKERS.values() if w.state == "idle"
-            and (is_admin or w.owner_user_id == user_id)]
-    if not pool:
+def pick_idle_worker_for(user_id: str, is_admin: bool,
+                         admin_user_ids: set[str]) -> Optional[Worker]:
+    """Pick an idle brain for a dispatch.
+
+    Routing rules:
+      - Admin: prefer their own idle brain, fall back to ANY idle brain
+        in the system (a "pool admin" can borrow another admin's brain
+        if their own pool is dry).
+      - Member: dispatch against any admin-owned idle brain (the shared
+        demo pool). Their own brains, if any (e.g. via /byob), are tried
+        first because they probably want to drive them; if none online,
+        fall back to the admin pool.
+
+    This is the heart of the "members don't need their own worker" UX:
+    one admin runs a few brains on their laptop and every signed-in
+    member can dispatch against that pool.
+    """
+    own = [w for w in WORKERS.values() if w.state == "idle" and w.owner_user_id == user_id]
+    own.sort(key=lambda w: w.last_assignment_at or 0)
+    if own:
+        return own[0]
+    if is_admin:
+        any_idle = [w for w in WORKERS.values() if w.state == "idle"]
+    else:
+        any_idle = [w for w in WORKERS.values()
+                    if w.state == "idle" and w.owner_user_id in admin_user_ids]
+    if not any_idle:
         return None
-    pool.sort(key=lambda w: w.last_assignment_at or 0)
-    return pool[0]
+    any_idle.sort(key=lambda w: w.last_assignment_at or 0)
+    return any_idle[0]
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -166,11 +187,18 @@ async def dispatch(req: web.Request) -> web.Response:
                                   "quota_minutes": user_row["quota_minutes"]}, status=429)
 
     is_admin = user_row["role"] == "admin"
-    worker = pick_idle_worker_for(user_row["id"], is_admin)
+    # Resolve the set of admins so members can route to their brains.
+    admin_user_ids = {u["id"] for u in await db.list_users() if u.get("role") == "admin"}
+    worker = pick_idle_worker_for(user_row["id"], is_admin, admin_user_ids)
     if worker is None:
-        return web.json_response({"error": "no idle worker for this account",
-                                  "hint": "start a worker.py with one of your gw_ keys"},
-                                 status=503)
+        # Friendlier message for members — they don't have brains of their
+        # own and the explanation "bring your own" wasn't actionable until
+        # /byob existed; until then it's just "demo busy."
+        if is_admin:
+            hint = "start a worker.py with one of your gw_ keys"
+        else:
+            hint = "the demo pool is empty right now — try again in a moment, or bring your own brain at /byob"
+        return web.json_response({"error": "demo_busy", "hint": hint}, status=503)
 
     aid = f"a-{int(time.time()*1000)}-{secrets.token_hex(3)}"
     msg = {

@@ -15,7 +15,7 @@ export default function WorkersPage() {
   const workers = workersResp?.workers ?? [];
 
   async function revoke(prefix: string, label: string) {
-    if (!confirm(`Revoke "${label}"? Any worker using this key will be disconnected.`)) return;
+    if (!confirm(`Revoke "${label}"? Any brain using this key will be disconnected.`)) return;
     try {
       await call("/api/worker-keys/revoke", {
         method: "POST",
@@ -31,9 +31,9 @@ export default function WorkersPage() {
   return (
     <div className="max-w-4xl mx-auto px-8 py-8 anim-fade">
       <header className="mb-8">
-        <h1 className="text-[26px] font-semibold tracking-tight">Workers</h1>
+        <h1 className="text-[26px] font-semibold tracking-tight">Brains</h1>
         <p className="text-[13px] text-[var(--color-fg-soft)] mt-1">
-          One key per machine. Each running worker = one Claude Code session that can run a dispatch.
+          One brain per machine. Each brain is a Claude Code session on your laptop that powers the bots.
         </p>
       </header>
 
@@ -47,7 +47,7 @@ export default function WorkersPage() {
           <span className="text-[12px] text-[var(--color-muted)]">{keys.length} total · {workers.length} online</span>
         </div>
         {keys.length === 0 ? (
-          <div className="surface p-8 text-center text-[13px] text-[var(--color-muted)]">No keys yet — mint one above.</div>
+          <div className="surface p-8 text-center text-[13px] text-[var(--color-muted)]">No brains yet — create one above.</div>
         ) : (
           <div className="space-y-2">
             {keys.map((k) => {

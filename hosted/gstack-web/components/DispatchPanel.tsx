@@ -82,7 +82,7 @@ export function DispatchPanel() {
       toast.push({
         kind: "ok",
         title: `${picked.size} specialist${picked.size === 1 ? "" : "s"} dispatched`,
-        body: `Assignment ${r.assignment_id.slice(0, 12)}… → worker ${r.worker_id}`,
+        body: `Assignment ${r.assignment_id.slice(0, 12)}… → brain ${r.worker_id}`,
       });
       // optimistic: clear pick & refresh
       setPicked(new Set());

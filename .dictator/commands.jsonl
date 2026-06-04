@@ -1,0 +1,10 @@
+{"command":"tts.speak","text":"Connected. I hear you. What do you need?"}
+{"command":"tts.speak","text":"Sounds good. The deploy is live, broker on Fly, frontend on Vercel, Clerk wired up. What do you want to change?"}
+{"command":"tts.speak","text":"Got it. So one shared worker pool that you run, visitors just sign in and dispatch, no worker setup for them. Admin sees the pool, members just see the dispatch panel. What is the one more thing?"}
+{"command":"tts.speak","text":"Three changes heard: one, shared worker pool you own, members just dispatch. Two, dynamic meet link generation. Three, turn-taking when multiple specialists are in the same call. Plus keep the GitHub story for cloners. Which do you want first?"}
+{"command":"tts.speak","text":"Better than renaming, just hide workers from members entirely. They are an admin concept. Members see one button: dispatch. Want me to start building these changes?"}
+{"command":"tts.speak","text":"Got it. Bring your own brain is a great frame for the fallback. Lets keep talking. Other thoughts?"}
+{"command":"tts.speak","text":"Empty state: show dispatch button always. If pool is dry on click, modal says demo is busy, two options: wait or bring your own brain. Bring your own brain links to a five minute install. Sound right?"}
+{"command":"tts.speak","text":"Rename worker to brain everywhere members see. Bring your own brain flow: clear explainer that its their own Claude session on their machine, scope limited to the demo, no data access beyond that. Lots of changes here. Should I start with the worker to brain rename plus shared pool, or the empty-state modal first?"}
+{"command":"tts.speak","text":"On it. Writing the full plan now."}
+{"command":"tts.speak","text":"Local first, deploy after each phase verifies. Starting Phase A now."}

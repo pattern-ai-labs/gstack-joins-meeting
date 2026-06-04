@@ -247,7 +247,7 @@ function HowItWorks() {
         <div className="grid md:grid-cols-3 gap-4">
           <Step
             num="1"
-            title="Run a worker"
+            title="Run a brain"
             body="One-line install on your laptop. Your Claude Code session is the brain that powers every bot."
             kicker="bring your own compute"
           />

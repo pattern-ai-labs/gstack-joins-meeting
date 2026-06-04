@@ -32,14 +32,14 @@ export default function AdminPage() {
       <header>
         <h1 className="text-[26px] font-semibold tracking-tight">Admin</h1>
         <p className="text-[13px] text-[var(--color-fg-soft)] mt-1">
-          You see everything: every user, every worker, every dispatch.
+          You see everything: every user, every brain, every dispatch.
         </p>
       </header>
 
       {/* metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Metric label="Users"            value={users.length} />
-        <Metric label="Workers online"   value={workers.length} sub={`${workers.filter((w) => w.state === "idle").length} idle`} />
+        <Metric label="Brains online"    value={workers.length} sub={`${workers.filter((w) => w.state === "idle").length} idle`} />
         <Metric label="Active calls"     value={activeNow} />
         <Metric label="Total minutes"    value={totalMin} />
       </div>
@@ -87,11 +87,11 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* workers */}
+      {/* brains */}
       <section>
-        <h2 className="text-[15px] font-semibold mb-3">All workers <span className="text-[12px] text-[var(--color-muted)] font-normal ml-1">({workers.length})</span></h2>
+        <h2 className="text-[15px] font-semibold mb-3">All brains <span className="text-[12px] text-[var(--color-muted)] font-normal ml-1">({workers.length})</span></h2>
         {workers.length === 0 ? (
-          <div className="surface p-6 text-[12.5px] text-[var(--color-muted)] text-center">No workers online.</div>
+          <div className="surface p-6 text-[12.5px] text-[var(--color-muted)] text-center">No brains online.</div>
         ) : (
           <div className="space-y-2">
             {workers.map((w) => (
