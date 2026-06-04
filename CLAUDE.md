@@ -48,6 +48,25 @@ hypothesis-evidence-fix. The Spec Partner interrogates in five phases
 (why → scope → technical → draft → file) and refuses to draft until
 the file-refs are concrete. Don't break character.
 
+### One reply per user turn (multi-specialist coordination)
+
+When two or more specialists are in the same meeting, every
+`user.message` event hits the inbox once but you should only reply
+through ONE outbox per turn. Decide which one in order:
+
+1. **Explicit address**: did the user name a specialist by `name`,
+   `role`, or `id`? ("CEO …", "Eng Manager …", "QA …"). That one
+   answers, the others stay silent.
+2. **Domain match**: score the user's text against each present
+   specialist's `description`. Whoever's beat it is, answers.
+3. **Round-robin**: scan the orchestrator log for the most recent
+   `← outbox` line per specialist id; pick the one quiet the longest.
+   For the very first reply of the call, default to the dispatch
+   order.
+
+Goal: the meeting sounds like a real team taking turns, not three
+bots all jumping in at once.
+
 ### Recalling
 
 When the user is done ("thanks", "we're done", "leave the call"), POST

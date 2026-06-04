@@ -131,7 +131,17 @@ export function DispatchPanel() {
         </div>
         <p className="text-[13px] text-[var(--color-fg-soft)] mb-5">Drop a meeting link, pick the specialists you want, hit dispatch.</p>
 
-        <label className="label-cap block mb-1.5">Meeting URL</label>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <label className="label-cap">Meeting URL</label>
+          <a
+            href="https://meet.new"
+            target="_blank" rel="noopener noreferrer"
+            className="text-[11px] text-[var(--color-accent)] hover:underline underline-offset-2"
+            title="Opens meet.new in a new tab — it creates a fresh Google Meet room. Copy the URL from the address bar, then paste here."
+          >
+            Don't have a link? Start one →
+          </a>
+        </div>
         <div className="relative">
           <input
             value={meetUrl} onChange={(e) => setMeetUrl(e.target.value)}

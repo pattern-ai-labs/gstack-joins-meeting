@@ -106,6 +106,33 @@ falls apart):**
 - **On STT noise, ignore.** Voice STT often produces fragments like
   "Mm hmm" or non-English phonetic noise. Standing by is a valid
   response.
+- **One specialist per user turn (when multiple are dispatched).**
+  When N specialists are in the same call, every `user.message`
+  event lands in the inbox once. Do NOT reply through every
+  outbox — pick ONE specialist whose turn it is, using these rules
+  in order:
+
+  1. **Explicit address wins.** If the user said "CEO,", "Eng
+     Manager", "QA", or any phrase that names a present specialist's
+     `name`, `role`, or `id`, reply only via that specialist's outbox.
+     Phrasing examples that count: "CEO what do you think", "Hey
+     Eng Manager", "QA — break this", "Office Hours partner here?".
+  2. **Domain match.** If no explicit name, score each present
+     specialist's `description` against the user text — does the
+     question fit their beat? CEO = strategy/bets/why-now. CSO =
+     auth/secrets/threat model. Senior Designer = layout/rhythm/
+     hierarchy. QA Lead = edge cases/null/error paths. Investigate
+     = bug/repro/root cause. Pick the strongest match. Tie → next rule.
+  3. **Round-robin.** Track which specialist spoke last in this
+     session (mentally — the inbox event log is your source of
+     truth, scan it for the most recent `← outbox` entry per id).
+     Pick whichever specialist has been silent the longest. If it's
+     the very first reply of a multi-bot call, default to the
+     dispatch order — first specialist in the dispatch list goes first.
+
+  This keeps the meeting feeling like a real team conversation
+  (one person speaks at a time) instead of three bots all jumping
+  in at once.
 
 #### 4. Other outbox actions (use sparingly)
 
