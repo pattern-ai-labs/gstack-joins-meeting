@@ -105,12 +105,14 @@ function UserPill() {
         href="https://github.com/pattern-ai-labs/gstack-joins-meeting"
         target="_blank" rel="noopener noreferrer"
         className="mx-3 mb-2 surface px-3 py-2.5 text-[12px] flex items-center gap-2 hover:bg-[var(--color-panel-2)] transition group"
-        title="The whole project is open source — clone + run with your own Claude session"
+        title="The whole project is open source — clone + run with your own coding agent session"
       >
         <span className="text-[14px]">⌥</span>
         <div className="flex-1 min-w-0">
           <div className="font-medium">Run gstack locally</div>
-          <div className="text-[10px] text-[var(--color-muted)]">open source · MIT</div>
+          <div className="text-[10px] text-[var(--color-muted)]">
+            inspired by <span className="text-[var(--color-accent)]">@garrytan</span> · MIT
+          </div>
         </div>
         <span className="text-[12px] text-[var(--color-muted)] group-hover:text-[var(--color-fg)]">→</span>
       </a>

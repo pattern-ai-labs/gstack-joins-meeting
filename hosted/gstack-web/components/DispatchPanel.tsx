@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApi, useApiSWR } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { SpecialistCard } from "./SpecialistCard";
@@ -35,6 +35,20 @@ export function DispatchPanel() {
   // explicitly passes mode: "audio").
   const mode = "avatar" as const;
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  // First-visit hint: auto-pick the Founding Team so a brand-new
+  // visitor doesn't have to figure out which specialists to choose
+  // before the demo button lights up. Marker is in localStorage so we
+  // only do this once per browser; users who clear their selection
+  // later don't get reset.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.localStorage.getItem("gstack:starter-picked")) return;
+    const founding = TEAMS.find((t) => t.id === "founding");
+    if (founding) {
+      setPicked(new Set(founding.specs));
+      window.localStorage.setItem("gstack:starter-picked", "1");
+    }
+  }, []);
   const [category, setCategory] = useState("All");
   const [pending, setPending] = useState(false);
   const [poolBusyOpen, setPoolBusyOpen] = useState(false);
@@ -146,9 +160,18 @@ export function DispatchPanel() {
       />
       {/* HERO */}
       <section className="surface p-6 anim-up">
-        <div className="flex items-end gap-3 mb-1">
+        <div className="flex items-end gap-3 mb-1 flex-wrap">
           <h1 className="text-[26px] font-semibold tracking-tight">Dispatch your team</h1>
           <span className="text-[12px] text-[var(--color-muted)] mb-1">{all.length} specialists · {TEAMS.length} team presets</span>
+          <a
+            href="https://github.com/garrytan/gstack"
+            target="_blank" rel="noopener noreferrer"
+            className="ml-auto inline-flex items-center gap-1.5 text-[11.5px] text-[var(--color-fg-soft)] hover:text-[var(--color-fg)] mb-1"
+            title="The 19 specialist personas were open-sourced by Garry Tan. This dashboard just brings them into your meeting."
+          >
+            <span className="w-4 h-4 rounded-full bg-[#ff6b2b] text-white flex items-center justify-center text-[9px] font-bold">G</span>
+            Personas by <span className="text-[var(--color-accent)] underline underline-offset-2">Garry Tan</span>
+          </a>
         </div>
         <p className="text-[13px] text-[var(--color-fg-soft)] mb-5">Drop a meeting link, pick the specialists you want, hit dispatch.</p>
 
