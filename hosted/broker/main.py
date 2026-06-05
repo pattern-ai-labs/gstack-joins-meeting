@@ -254,6 +254,18 @@ async def recall(req: web.Request) -> web.Response:
             sent += 1
         except Exception:
             pass
+        # Optimistically mark the in-flight assignment ended NOW, instead
+        # of waiting for the worker's state=idle ack. If the ack arrives
+        # we'll re-update (idempotent). If it never arrives (worker
+        # crashed mid-recall, WS write failed, etc.) the dashboard
+        # still clears immediately — no orphan.
+        if w.last_assignment_id:
+            try:
+                await db.update_assignment_status(
+                    w.last_assignment_id, "ended", {"reason": "recalled"},
+                )
+            except Exception as e:
+                print(f"[recall] cleanup failed for {w.id}: {e}", flush=True)
     await db.audit(user_row["id"], "recall", {"count": sent})
     return web.json_response({"ok": True, "recalled": sent})
 
@@ -264,6 +276,33 @@ async def list_assignments(req: web.Request) -> web.Response:
         return web.json_response({"error": "unauthorized"}, status=401)
     is_admin = user_row["role"] == "admin"
     rows = await db.list_assignments(user_id=None if is_admin else user_row["id"], limit=100)
+
+    # Self-heal sweep: if a row says 'started' but the worker isn't
+    # actually mid-call right now (disconnected entirely, or connected
+    # but idle, or busy on a DIFFERENT assignment), it's an orphan from
+    # a past crash/disconnect. Clear it in-place so the dashboard's live
+    # call card disappears the moment the cleanup-on-disconnect path
+    # missed something — or on cold-start after a broker redeploy when
+    # WORKERS is empty but the DB remembers old started rows.
+    for r in rows:
+        if r.get("status") != "started":
+            continue
+        wid = r.get("worker_id")
+        live = WORKERS.get(wid) if wid else None
+        is_in_flight = (
+            live is not None
+            and live.state == "busy"
+            and live.last_assignment_id == r["id"]
+        )
+        if not is_in_flight:
+            try:
+                await db.update_assignment_status(
+                    r["id"], "ended", {"reason": "orphan_swept"},
+                )
+                r["status"] = "ended"
+            except Exception as e:
+                print(f"[sweep] failed for {r.get('id')}: {e}", flush=True)
+
     return web.json_response({"assignments": [_assignment_safe(r) for r in rows]})
 
 
@@ -446,6 +485,20 @@ async def worker_ws(req: web.Request) -> web.WebSocketResponse:
             elif msg.type == WSMsgType.ERROR:
                 break
     finally:
+        # If the worker drops while still mid-assignment (network blip,
+        # laptop sleep, runner crash, bridge OOM), the broker would
+        # otherwise leak a status='started' row in the DB forever — the
+        # dashboard's "Now in meeting" card would keep showing a phantom
+        # call with an ever-growing elapsed timer. Mark any open
+        # assignment ended on the way out so the orphan never appears.
+        if worker.state == "busy" and worker.last_assignment_id:
+            try:
+                await db.update_assignment_status(
+                    worker.last_assignment_id, "ended",
+                    {"reason": "worker_disconnected"},
+                )
+            except Exception as e:
+                print(f"[worker {worker.id}] cleanup failed: {e}", flush=True)
         WORKERS.pop(worker.id, None)
         await db.audit(owner, "worker.disconnected", {"worker_id": worker.id})
     return ws
