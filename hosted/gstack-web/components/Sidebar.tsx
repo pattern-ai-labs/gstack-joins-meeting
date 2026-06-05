@@ -6,9 +6,12 @@ import { useApiSWR } from "@/lib/api";
 import type { User } from "@/lib/types";
 
 // Member nav — visible to everyone signed in. Just the action surface.
+// BYOB lives here so members who hit the "pool busy" modal can find
+// the bring-your-own-brain flow without admin context.
 const MEMBER_NAV = [
-  { href: "/",            label: "Dashboard",   icon: HomeIcon },
-  { href: "/specialists", label: "Specialists", icon: GridIcon },
+  { href: "/",            label: "Dashboard",        icon: HomeIcon  },
+  { href: "/specialists", label: "Specialists",      icon: GridIcon  },
+  { href: "/byob",        label: "Bring your brain", icon: BrainIcon },
 ];
 
 // Admin nav — hidden from members. Internal management surface for the
@@ -170,4 +173,7 @@ function ChipIcon(p: React.SVGProps<SVGSVGElement>) {
 }
 function ShieldIcon(p: React.SVGProps<SVGSVGElement>) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/></svg>;
+}
+function BrainIcon(p: React.SVGProps<SVGSVGElement>) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M9 3a3 3 0 0 0-3 3v0a3 3 0 0 0-2 5v0a3 3 0 0 0 1 5v0a3 3 0 0 0 4 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3z"/><path d="M15 3a3 3 0 0 1 3 3v0a3 3 0 0 1 2 5v0a3 3 0 0 1-1 5v0a3 3 0 0 1-4 3 3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"/></svg>;
 }

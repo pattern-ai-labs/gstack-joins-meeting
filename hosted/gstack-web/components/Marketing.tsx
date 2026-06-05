@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import Image from "next/image";
 import { SignInButton, SignedIn, SignedOut } from "@/lib/auth";
 import { isDevAuth } from "@/lib/auth-mode";
 
@@ -31,10 +30,8 @@ export function Marketing() {
     <div className="w-full anim-fade">
       <Topbar />
       <Hero />
-      <GarryRibbon />
-      <SpecialistMarquee />
       <HowItWorks />
-      <Showcase />
+      <SpecialistGrid />
       <InstallBlock />
       <WhyExists />
       <ThanksGarry />
@@ -88,9 +85,9 @@ function Hero() {
         </h1>
 
         <p className="text-[17px] sm:text-[19px] text-[var(--color-fg-soft)] max-w-2xl mx-auto mt-7 leading-relaxed anim-up" style={{ animationDelay: "140ms" }}>
-          Every gstack specialist — CEO, CSO, QA Lead, Senior Designer, SRE, Spec Partner —
-          joins your Google Meet, Zoom, or Teams as a real voice bot with its own 3D avatar.
-          Powered by your Claude Code session. Free forever, open source, no SaaS lock-in.
+          Paste a Meet URL. Pick specialists.
+          <br className="hidden sm:inline" />
+          They join in character — with a 3D avatar and their own voice.
         </p>
 
         <div className="flex items-center justify-center gap-3 mt-10 anim-up" style={{ animationDelay: "220ms" }}>
@@ -102,10 +99,6 @@ function Hero() {
           >
             <GhIcon className="w-4 h-4 mr-1" /> Star on GitHub
           </a>
-        </div>
-
-        <div className="mt-14 text-[12px] mono text-[var(--color-muted)] anim-up" style={{ animationDelay: "300ms" }}>
-          built on top of <a href="https://github.com/garrytan/gstack" target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] underline underline-offset-4">garrytan/gstack</a> + <a href="https://agentcall.dev" target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] underline underline-offset-4">AgentCall</a>
         </div>
       </div>
     </section>
@@ -147,65 +140,43 @@ function BackgroundGlow() {
   );
 }
 
-/* ─── garry ribbon ───────────────────────────────────────────────── */
-
-function GarryRibbon() {
+/* ─── specialist grid (replaces Showcase + Marquee) ───────────────
+ * Per user feedback: the old "dashboard your team will use" product
+ * screenshot was long and not the most compelling visual. People want
+ * to SEE the cast first — who shows up, what they do. The grid below
+ * mirrors the dashboard's Specialists section: every persona on one
+ * page, each clickable to GitHub for the source prompt. Replaces the
+ * scrolling marquee too — static beats motion when the user actually
+ * wants to read names. */
+function SpecialistGrid() {
   return (
-    <section className="border-y border-[var(--color-border)] bg-[var(--color-bg-soft)]">
-      <div className="max-w-5xl mx-auto px-6 py-4 flex flex-wrap items-center justify-center gap-3 text-[13px] text-center">
-        <span className="text-[var(--color-fg-soft)] shrink-0">Built on</span>
-        <a
-          href="https://github.com/garrytan/gstack"
-          target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 chip chip-active hover:scale-[1.02] transition"
-          title="gstack — the slash-command persona library by Garry Tan (President & CEO, YC)"
-        >
-          <span
-            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
-            style={{ background: "#ff6b2b", color: "#fff" }}
-          >G</span>
-          <span><strong>gstack</strong> <span className="text-[11px] opacity-70">by @garrytan</span></span>
-        </a>
-        <span className="text-[var(--color-fg-soft)] shrink-0">+</span>
-        <a
-          href="https://agentcall.dev"
-          target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 chip chip-active hover:scale-[1.02] transition"
-          title="AgentCall — the meeting-bot platform by Pattern AI Labs"
-        >
-          <span
-            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
-            style={{ background: "#c8ff3a", color: "#0a0b07" }}
-          >A</span>
-          <span><strong>AgentCall</strong> <span className="text-[11px] opacity-70">by Pattern AI Labs</span></span>
-        </a>
-        <span className="text-[var(--color-fg-soft)] shrink-0">— thank you both.</span>
-      </div>
-    </section>
-  );
-}
+    <section className="py-20 border-t border-[var(--color-border)]">
+      <div className="max-w-5xl mx-auto px-6">
+        <div className="text-center mb-10">
+          <div className="label-cap mb-3">The roster</div>
+          <h2 className="text-[32px] sm:text-[40px] font-semibold tracking-tight">
+            19 specialists. One paste.
+          </h2>
+          <p className="text-[14px] text-[var(--color-fg-soft)] mt-3 max-w-xl mx-auto">
+            Every specialist from{" "}
+            <a
+              href="https://github.com/garrytan/gstack"
+              target="_blank" rel="noopener noreferrer"
+              className="text-[var(--color-accent)] underline underline-offset-4"
+            >Garry Tan's gstack</a>
+            {" "}— adapted to a real voice agent with a distinct voice and avatar.
+          </p>
+        </div>
 
-/* ─── specialist marquee ─────────────────────────────────────────── */
-
-function SpecialistMarquee() {
-  // Render twice for seamless looping
-  const row = [...SPECIALISTS, ...SPECIALISTS];
-  return (
-    <section className="py-16 overflow-hidden">
-      <div className="max-w-5xl mx-auto px-6 mb-8 text-center">
-        <div className="label-cap mb-3">The roster</div>
-        <h2 className="text-[32px] sm:text-[40px] font-semibold tracking-tight">19 specialists. One paste.</h2>
-        <p className="text-[14px] text-[var(--color-fg-soft)] mt-2 max-w-xl mx-auto">
-          Every specialist from Garry's gstack — adapted to a real voice agent with a distinct voice and avatar.
-        </p>
-      </div>
-      <div className="relative" style={{
-        maskImage: "linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%)",
-      }}>
-        <div className="flex gap-3 animate-marquee" style={{ width: "max-content" }}>
-          {row.map((s, i) => (
-            <div key={`${s.id}-${i}`} className="card flex items-center gap-3 px-4 py-3 shrink-0 min-w-[210px]">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {SPECIALISTS.map((s) => (
+            <a
+              key={s.id}
+              href={`https://github.com/garrytan/gstack/blob/main/${s.id}.md`}
+              target="_blank" rel="noopener noreferrer"
+              className="surface p-4 flex items-center gap-3 hover:bg-[var(--color-panel-2)] transition group"
+              title={`Open ${s.name} source prompt on GitHub`}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/avatars/${s.id}.svg`}
@@ -215,24 +186,24 @@ function SpecialistMarquee() {
                 style={{ boxShadow: `inset 0 0 0 1px ${s.accent}55` }}
                 loading="lazy"
               />
-              <div>
-                <div className="font-medium text-[13px]">{s.name}</div>
-                <div className="text-[11px] text-[var(--color-muted)]">{s.role}</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-[13px] truncate">{s.name}</div>
+                <div className="text-[11px] text-[var(--color-muted)] truncate">{s.role}</div>
               </div>
-            </div>
+              <span className="text-[var(--color-muted)] group-hover:text-[var(--color-fg)] text-[12px] opacity-0 group-hover:opacity-100 transition">↗</span>
+            </a>
           ))}
         </div>
+
+        <div className="text-center mt-8">
+          <Link
+            href="/specialists"
+            className="btn btn-outline px-5 py-2.5 text-[13px]"
+          >
+            Browse all specialists →
+          </Link>
+        </div>
       </div>
-      <style jsx>{`
-        @keyframes marquee {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        :global(.animate-marquee) {
-          animation: marquee 60s linear infinite;
-        }
-        :global(.animate-marquee:hover) { animation-play-state: paused; }
-      `}</style>
     </section>
   );
 }
@@ -250,20 +221,20 @@ function HowItWorks() {
         <div className="grid md:grid-cols-3 gap-4">
           <Step
             num="1"
-            title="Run a brain"
-            body="One-line install on your laptop. Your Claude Code session is the brain that powers every bot."
-            kicker="bring your own compute"
+            title="Paste a Meet URL"
+            body="Or hit Start one to spin up a fresh Meet in a click. Works for Google Meet, Zoom, Teams."
+            kicker="any meeting"
           />
           <Step
             num="2"
-            title="Paste a Meet URL"
-            body="Pick the specialists you want — solo or as a curated team like Founding or QA & Ship."
-            kicker="one click dispatch"
+            title="Pick specialists"
+            body="Solo, or a curated team — Founding, Design, QA & Ship, DX. Six presets, 19 specialists."
+            kicker="solo or team"
           />
           <Step
             num="3"
-            title="Bots join, in character"
-            body="Each specialist appears as a unique avatar with its own voice. They listen, respond, then leave on recall."
+            title="They join in character"
+            body="Each specialist appears with their own 3D avatar and voice. They listen, respond, leave when recalled."
             kicker="real meeting participants"
           />
         </div>
@@ -280,39 +251,6 @@ function Step({ num, title, body, kicker }: { num: string; title: string; body: 
       <div className="font-semibold text-[16px] mb-2">{title}</div>
       <div className="text-[13px] text-[var(--color-fg-soft)] leading-snug">{body}</div>
     </div>
-  );
-}
-
-/* ─── showcase (screenshot) ──────────────────────────────────────── */
-
-function Showcase() {
-  return (
-    <section className="py-20 border-t border-[var(--color-border)]">
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="text-center mb-10">
-          <div className="label-cap mb-3">The product</div>
-          <h2 className="text-[32px] sm:text-[40px] font-semibold tracking-tight">A dashboard your team will use.</h2>
-        </div>
-        <div className="relative">
-          {/* subtle glow behind screenshot */}
-          <div className="absolute inset-0 rounded-2xl"
-               style={{
-                 background: "radial-gradient(60% 50% at 50% 0%, var(--color-accent-soft) 0%, transparent 70%)",
-                 filter: "blur(40px)",
-               }} aria-hidden />
-          <div className="surface relative p-2 rounded-2xl">
-            {/* Use the existing dashboard screenshot from /docs */}
-            <Image
-              src="/docs-dashboard.png"
-              alt="gstack dashboard — paste a Meet URL, pick specialists, dispatch"
-              width={2576} height={1445}
-              className="rounded-xl w-full h-auto"
-              priority
-            />
-          </div>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -399,8 +337,12 @@ function Stat({ n, l, sub }: { n: string; l: string; sub?: string }) {
 /* ─── thanks garry ───────────────────────────────────────────────── */
 
 function ThanksGarry() {
+  // User-centric testimonial — the visitor just tried it; the tweet is
+  // them sharing what they did. Frame it as "I tried X and Y happened"
+  // (NOT "we just shipped"). Keeps the verb tense first-person past so
+  // it works for anyone clicking the button.
   const tweet = encodeURIComponent(
-    "just shipped gstack-joins-meeting — turns @garrytan's gstack specialists into real voice bots that join your Google Meet. open source, MIT. thanks Garry for shipping the personas. https://github.com/pattern-ai-labs/gstack-joins-meeting"
+    "I tried @garrytan's gstack specialists in a real Google Meet — they joined as voice bots and reviewed my startup pitch in character. Wild. https://gstack-joins-meeting.vercel.app"
   );
   return (
     <section className="py-24 border-t border-[var(--color-border)] bg-[var(--color-bg-soft)] relative overflow-hidden">

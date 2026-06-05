@@ -19,8 +19,9 @@ export function MobileHeader() {
   const isAdmin = meResp?.user?.role === "admin";
 
   const memberNav = [
-    { href: "/",            label: "Dashboard" },
-    { href: "/specialists", label: "Specialists" },
+    { href: "/",            label: "Dashboard"        },
+    { href: "/specialists", label: "Specialists"      },
+    { href: "/byob",        label: "Bring your brain" },
   ];
   const adminNav = [
     { href: "/calls",   label: "Calls" },
