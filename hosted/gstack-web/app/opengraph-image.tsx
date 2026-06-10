@@ -42,10 +42,10 @@ export default async function OpengraphImage() {
           justifyContent: "space-between",
           padding: 64,
           fontFamily: "Inter, system-ui, sans-serif",
-          background:
+          backgroundColor: INK_BG,
+          backgroundImage:
             "radial-gradient(800px 500px at 80% -10%, rgba(200, 255, 58, 0.16), transparent 60%), " +
-            "radial-gradient(600px 400px at 0% 110%, rgba(255, 107, 43, 0.08), transparent 60%), " +
-            INK_BG,
+            "radial-gradient(600px 400px at 0% 110%, rgba(255, 107, 43, 0.08), transparent 60%)",
           color: "#ecedef",
         }}
       >
