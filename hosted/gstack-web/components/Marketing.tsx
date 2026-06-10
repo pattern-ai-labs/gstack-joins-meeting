@@ -401,10 +401,13 @@ function Footer() {
     <footer className="py-12 border-t border-[var(--color-border)]">
       <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-4 gap-8 text-[13px]">
         <div className="md:col-span-2">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-6 h-6 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)] flex items-center justify-center font-bold text-[11px]">G</span>
-            <span className="font-semibold">gstack joins your meeting</span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logos/gstack-x-agentcall-lockup.svg"
+            alt="gstack × agentcall — joins your meeting"
+            width={570} height={115}
+            className="h-12 w-auto mb-4"
+          />
           <p className="text-[12px] text-[var(--color-muted)] leading-relaxed max-w-md">
             An open-source bridge from <a className="underline" href="https://github.com/garrytan/gstack" target="_blank" rel="noopener noreferrer">gstack</a> to live voice meetings via <a className="underline" href="https://agentcall.dev" target="_blank" rel="noopener noreferrer">AgentCall</a>. MIT. Built by <a className="underline" href="https://github.com/pattern-ai-labs" target="_blank" rel="noopener noreferrer">Pattern AI Labs</a>.
           </p>

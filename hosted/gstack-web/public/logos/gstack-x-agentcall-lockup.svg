@@ -1,0 +1,7 @@
+<svg viewBox="95 20 570 115" width="570" height="115" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="gstack × agentcall — joins your meeting. Best on dark backgrounds (#0a0b07).">
+  <!-- lime gstack, cream agentcall, Garry-orange × at the heart of the collab -->
+  <text x="380" y="80" text-anchor="middle" font-family="-apple-system,'Segoe UI',sans-serif" font-size="58" font-weight="800" letter-spacing="-1.5"><tspan fill="#c8ff3a">gstack</tspan><tspan fill="#ff6b2b" font-size="40"> ✕ </tspan><tspan fill="#f4eedd">agentcall</tspan></text>
+  <line x1="150" y1="113" x2="238" y2="113" stroke="#5c6052" stroke-width="1"/>
+  <text x="380" y="117" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="12" letter-spacing="7" fill="#9aa08c">JOINS YOUR MEETING</text>
+  <line x1="522" y1="113" x2="610" y2="113" stroke="#5c6052" stroke-width="1"/>
+</svg>
