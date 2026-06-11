@@ -46,10 +46,15 @@ function Topbar() {
   return (
     <header className="sticky top-0 z-40 glass border-b border-[var(--color-border)]">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-fg)] flex items-center justify-center font-bold text-sm">G</span>
-          <span className="text-[15px] font-semibold tracking-tight">gstack</span>
-          <span className="text-[10px] mono text-[var(--color-muted)] mt-1">joins your meeting</span>
+        {/* topbar lockup — variant D at DOM scale: lime gstack, orange ✕,
+            cream agentcall. The full SVG (with tagline) stays in the footer;
+            shrunk to 28px the tagline would be mush, so the topbar gets the
+            wordmark row rebuilt in text. */}
+        <Link href="/" className="flex items-center gap-2">
+          <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-fg)] flex items-center justify-center font-bold text-sm mr-0.5">G</span>
+          <span className="text-[15px] font-semibold tracking-tight text-[var(--color-accent)]">gstack</span>
+          <span className="text-[12px] font-bold" style={{ color: "#ff6b2b" }}>✕</span>
+          <span className="text-[15px] font-semibold tracking-tight" style={{ color: "#f4eedd" }}>agentcall</span>
         </Link>
         <nav className="flex items-center gap-2 text-[13px]">
           <a href="#how" className="hidden sm:inline px-3 py-1.5 text-[var(--color-fg-soft)] hover:text-[var(--color-fg)]">How it works</a>
