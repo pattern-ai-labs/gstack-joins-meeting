@@ -89,16 +89,22 @@ function Hero() {
           <span className="gradient-text">gstack</span> joins<br/>your meeting.
         </h1>
 
+        {/* Two blocks instead of a forced <br>: the lead-in wraps with
+            text-balance into even lines, the verb clause sits alone in
+            full-strength white. A hard break inside flowing text fought
+            the natural wrap and orphaned a stubby middle line. */}
         <p className="text-[17px] sm:text-[19px] text-[var(--color-fg-soft)] max-w-2xl mx-auto mt-7 leading-relaxed anim-up" style={{ animationDelay: "140ms" }}>
-          <a
-            href="https://github.com/garrytan/gstack"
-            target="_blank" rel="noopener noreferrer"
-            className="text-[var(--color-accent)] underline underline-offset-4 decoration-[var(--color-accent-ring)]"
-          >Garry Tan's gstack</a>
-          {" "}specialists — CEO, CSO, QA Lead and 16 more — sit in your meeting
-          like real teammates:
-          <br className="hidden sm:inline" />
-          <span className="text-[var(--color-fg)]"> they question the plan, validate the direction, and push you to ship.</span>
+          <span className="block text-balance">
+            <a
+              href="https://github.com/garrytan/gstack"
+              target="_blank" rel="noopener noreferrer"
+              className="text-[var(--color-accent)] underline underline-offset-4 decoration-[var(--color-accent-ring)]"
+            >Garry Tan's gstack</a>
+            {" "}specialists — CEO, CSO, QA Lead and 16 more — sit in your meeting like real teammates:
+          </span>
+          <span className="block mt-1.5 text-[var(--color-fg)] text-balance">
+            they question the plan, validate the direction, and push you to ship.
+          </span>
         </p>
 
         <div className="flex items-center justify-center gap-3 mt-10 anim-up" style={{ animationDelay: "220ms" }}>
