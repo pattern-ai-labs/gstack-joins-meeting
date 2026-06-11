@@ -41,11 +41,32 @@ export type Assignment = {
   specialists: string[];
   brief?: string;
   mode: string;
-  status: "started" | "ended" | "failed" | "rejected" | "cancelled" | "pending";
+  status: "started" | "ended" | "failed" | "rejected" | "cancelled" | "pending" | "queued";
   detail?: unknown;
   created_at?: string;
+  dispatched_at?: string;
   ended_at?: string;
   billable_seconds?: number;
+  summary?: string | null;
+  queue_position?: number | null;
+  progress?: { stage: string; joined: string[] };
+};
+
+export type TranscriptEntry = {
+  seq: number;
+  kind: "user" | "bot";
+  speaker: string;
+  specialist_id: string;
+  text: string;
+  ts: number;
+};
+
+export type TranscriptResponse = {
+  entries: TranscriptEntry[];
+  stage?: string | null;
+  joined: string[];
+  status: Assignment["status"];
+  summary?: string | null;
 };
 
 export type WorkerKey = {

@@ -21,6 +21,12 @@ before doing anything else:
    `/tmp/gstack-specialists-$(id -u)/active.json` but no Monitor
    running, the user dispatched from the dashboard UI without you —
    adopt them by starting the Monitor immediately.
+5. **Two extra inbox event kinds** (hosted dashboard integration):
+   lines with `"source":"dashboard"` are user messages typed in the
+   web dashboard's say box — reply like any spoken turn. Lines with
+   `"event":"summary.request"` ask you to write markdown call notes
+   to their `write_to` path within ~2 min; the worker ships the file
+   to the dashboard as the post-call "call notes" card. See SKILL.md §3.
 
 ### Quick triage when arriving
 

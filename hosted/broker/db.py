@@ -227,21 +227,72 @@ async def touch_worker_key(key_hash: str) -> None:
 async def insert_assignment(
     aid: str, user_id: str, worker_id: Optional[str], worker_key_hash: Optional[str],
     meet_url: str, specialists: list, brief: str, mode: str,
+    status: str = "started",
 ) -> dict:
+    """status='started' for immediate dispatch (dispatched_at=now),
+    status='queued' when no brain is free (dispatched_at stays NULL until
+    a worker picks it up via mark_dispatched)."""
     pool = await init_pool()
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
                 """INSERT INTO assignments (id, user_id, worker_id, worker_key_hash,
-                                            meet_url, specialists, brief, mode, status)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'started')
+                                            meet_url, specialists, brief, mode, status,
+                                            dispatched_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s,
+                           CASE WHEN %s = 'started' THEN now() ELSE NULL END)
                    RETURNING *""",
                 (aid, user_id, worker_id, worker_key_hash,
-                 meet_url, json.dumps(specialists), brief, mode),
+                 meet_url, json.dumps(specialists), brief, mode, status, status),
             )
             row = await cur.fetchone()
         await conn.commit()
     return row  # type: ignore[return-value]
+
+
+async def mark_dispatched(aid: str, worker_id: str, worker_key_hash: Optional[str]) -> None:
+    """A queued assignment just reached a worker — stamp the real start."""
+    pool = await init_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """UPDATE assignments
+                   SET status='started', worker_id=%s, worker_key_hash=%s,
+                       dispatched_at=now()
+                   WHERE id=%s""",
+                (worker_id, worker_key_hash, aid),
+            )
+        await conn.commit()
+
+
+async def get_assignment(aid: str) -> Optional[dict]:
+    pool = await init_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute("SELECT * FROM assignments WHERE id=%s", (aid,))
+            return await cur.fetchone()
+
+
+async def list_queued_assignments() -> list[dict]:
+    """Oldest-first queue, reloaded by the broker on startup."""
+    pool = await init_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                "SELECT * FROM assignments WHERE status='queued' ORDER BY created_at",
+            )
+            return list(await cur.fetchall())
+
+
+async def set_assignment_summary(aid: str, summary: str) -> None:
+    pool = await init_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE assignments SET summary=%s WHERE id=%s",
+                (summary[:20000], aid),
+            )
+        await conn.commit()
 
 
 async def update_assignment_status(aid: str, status: str, detail: Any = None) -> None:
@@ -249,10 +300,13 @@ async def update_assignment_status(aid: str, status: str, detail: Any = None) ->
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             if status == "ended":
+                # Billable time counts from when the call actually started
+                # (dispatched_at) — a 10-minute wait in the queue is free.
                 await cur.execute(
                     """UPDATE assignments
                        SET status=%s, detail=%s, ended_at=now(),
-                           billable_seconds = EXTRACT(EPOCH FROM (now() - created_at))::int
+                           billable_seconds = EXTRACT(EPOCH FROM
+                               (now() - COALESCE(dispatched_at, created_at)))::int
                        WHERE id=%s""",
                     (status, json.dumps(detail) if detail is not None else None, aid),
                 )

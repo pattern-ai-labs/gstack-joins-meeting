@@ -44,6 +44,7 @@ import json
 import os
 import secrets
 import time
+from collections import deque
 from typing import Optional
 
 from aiohttp import web, WSMsgType
@@ -97,6 +98,108 @@ class Worker:
 
 
 WORKERS: dict[str, Worker] = {}
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# in-memory live-call state (Phase 3)
+#
+# TRANSCRIPTS — per-assignment ring buffer of meeting events forwarded by
+# the worker (user utterances from the bus inbox, bot replies from the
+# outbox). Ephemeral by design: survives for the dashboard's live view,
+# evicted FIFO after MAX_TRANSCRIPT_ASSIGNMENTS calls. The durable
+# artifact is the post-call summary, which lands in Postgres.
+#
+# PROGRESS — per-assignment dispatch stage for the stepper UI
+# (accepted → launching → started → joined). Worker-reported.
+#
+# QUEUE — FIFO of dispatches that arrived while no brain was idle.
+# Mirrored in the DB (status='queued') so a broker restart reloads it.
+
+TRANSCRIPTS: dict[str, deque] = {}
+TRANSCRIPT_SEQ: dict[str, int] = {}
+PROGRESS: dict[str, dict] = {}
+MAX_TRANSCRIPT_ASSIGNMENTS = 60
+
+QUEUE: list[dict] = []          # {id,user_id,meet_url,specialists,brief,mode,created_ts}
+QUEUE_TTL_SEC = 600             # 10 min in line, then auto-cancel
+
+
+def append_transcript(aid: str, entry: dict) -> None:
+    if aid not in TRANSCRIPTS:
+        while len(TRANSCRIPTS) >= MAX_TRANSCRIPT_ASSIGNMENTS:
+            oldest = next(iter(TRANSCRIPTS))
+            TRANSCRIPTS.pop(oldest, None)
+            TRANSCRIPT_SEQ.pop(oldest, None)
+        TRANSCRIPTS[aid] = deque(maxlen=400)
+    seq = TRANSCRIPT_SEQ.get(aid, 0) + 1
+    TRANSCRIPT_SEQ[aid] = seq
+    entry["seq"] = seq
+    TRANSCRIPTS[aid].append(entry)
+
+
+def queue_position(aid: str) -> Optional[int]:
+    for i, item in enumerate(QUEUE):
+        if item["id"] == aid:
+            return i + 1
+    return None
+
+
+def _assignment_msg(aid: str, meet_url: str, specs: list, brief: str, mode: str,
+                    max_duration_min: int = 30) -> dict:
+    return {
+        "type":              "assignment",
+        "id":                aid,
+        "meetUrl":           meet_url,
+        "specialists":       specs,
+        "brief":             brief,
+        "mode":              mode,
+        "agentcall_api_key": TRANSIENT_AGENTCALL_KEY,
+        "end_at":            time.time() + max_duration_min * 60,
+    }
+
+
+async def expire_stale_queued() -> None:
+    now = time.time()
+    for item in list(QUEUE):
+        if now - item["created_ts"] > QUEUE_TTL_SEC:
+            QUEUE.remove(item)
+            try:
+                await db.update_assignment_status(
+                    item["id"], "cancelled", {"reason": "queue_expired"})
+            except Exception as e:
+                print(f"[queue] expire failed for {item['id']}: {e}", flush=True)
+
+
+async def try_dispatch_queued() -> None:
+    """Called whenever a brain frees up (state→idle) or connects. Walks the
+    queue oldest-first and places every item a now-idle worker can take."""
+    await expire_stale_queued()
+    if not QUEUE:
+        return
+    users = {u["id"]: u for u in await db.list_users()}
+    admin_user_ids = {uid for uid, u in users.items() if u.get("role") == "admin"}
+    for item in list(QUEUE):
+        urow = users.get(item["user_id"])
+        is_admin = bool(urow and urow.get("role") == "admin")
+        worker = pick_idle_worker_for(item["user_id"], is_admin, admin_user_ids)
+        if worker is None:
+            continue
+        msg = _assignment_msg(item["id"], item["meet_url"], item["specialists"],
+                              item["brief"], item["mode"])
+        try:
+            await worker.ws.send_str(json.dumps(msg))
+        except Exception as e:
+            print(f"[queue] send to {worker.id} failed: {e}", flush=True)
+            continue
+        worker.state = "busy"
+        worker.last_assignment_id = item["id"]
+        worker.last_assignment_at = time.time()
+        QUEUE.remove(item)
+        PROGRESS[item["id"]] = {"stage": "accepted", "joined": [], "ts": time.time()}
+        await db.mark_dispatched(item["id"], worker.id, worker.key_hash)
+        await db.audit(item["user_id"], "dispatch.dequeued",
+                       {"assignment_id": item["id"], "worker_id": worker.id,
+                        "waited_s": int(time.time() - item["created_ts"])})
 
 
 def _hash_key(key: str) -> str:
@@ -190,27 +293,35 @@ async def dispatch(req: web.Request) -> web.Response:
     # Resolve the set of admins so members can route to their brains.
     admin_user_ids = {u["id"] for u in await db.list_users() if u.get("role") == "admin"}
     worker = pick_idle_worker_for(user_row["id"], is_admin, admin_user_ids)
-    if worker is None:
-        # Friendlier message for members — they don't have brains of their
-        # own and the explanation "bring your own" wasn't actionable until
-        # /byob existed; until then it's just "demo busy."
-        if is_admin:
-            hint = "start a worker.py with one of your gw_ keys"
-        else:
-            hint = "the demo pool is empty right now — try again in a moment, or bring your own brain at /byob"
-        return web.json_response({"error": "demo_busy", "hint": hint}, status=503)
 
-    aid = f"a-{int(time.time()*1000)}-{secrets.token_hex(3)}"
-    msg = {
-        "type":              "assignment",
-        "id":                aid,
-        "meetUrl":           meet_url,
-        "specialists":       specs,
-        "brief":             body.get("brief", ""),
-        "mode":              body.get("mode", "avatar"),
-        "agentcall_api_key": TRANSIENT_AGENTCALL_KEY,
-        "end_at":            time.time() + (int(body.get("max_duration_min", 30)) * 60),
-    }
+    aid   = f"a-{int(time.time()*1000)}-{secrets.token_hex(3)}"
+    brief = body.get("brief", "")
+    mode  = body.get("mode", "avatar")
+
+    if worker is None:
+        # No brain free → hold the dispatch in the queue instead of
+        # bouncing the user with a 503. The assignment row is created
+        # with status='queued' (dispatched_at NULL); try_dispatch_queued
+        # fires it the moment a brain goes idle or connects. 10-min TTL.
+        await db.insert_assignment(
+            aid, user_row["id"], None, None, meet_url, specs, brief, mode,
+            status="queued",
+        )
+        QUEUE.append({
+            "id": aid, "user_id": user_row["id"], "meet_url": meet_url,
+            "specialists": specs, "brief": brief, "mode": mode,
+            "created_ts": time.time(),
+        })
+        await db.audit(user_row["id"], "dispatch.queued",
+                       {"assignment_id": aid, "position": len(QUEUE)})
+        return web.json_response(
+            {"ok": True, "queued": True, "assignment_id": aid,
+             "position": len(QUEUE)},
+            status=202,
+        )
+
+    msg = _assignment_msg(aid, meet_url, specs, brief, mode,
+                          int(body.get("max_duration_min", 30)))
     try:
         await worker.ws.send_str(json.dumps(msg))
     except Exception as e:
@@ -219,10 +330,11 @@ async def dispatch(req: web.Request) -> web.Response:
     worker.state = "busy"
     worker.last_assignment_id = aid
     worker.last_assignment_at = time.time()
+    PROGRESS[aid] = {"stage": "accepted", "joined": [], "ts": time.time()}
 
     await db.insert_assignment(
         aid, user_row["id"], worker.id, worker.key_hash,
-        meet_url, specs, body.get("brief", ""), body.get("mode", "avatar"),
+        meet_url, specs, brief, mode,
     )
     await db.audit(user_row["id"], "dispatch",
                    {"assignment_id": aid, "worker_id": worker.id, "meet_url": meet_url})
@@ -303,7 +415,104 @@ async def list_assignments(req: web.Request) -> web.Response:
             except Exception as e:
                 print(f"[sweep] failed for {r.get('id')}: {e}", flush=True)
 
-    return web.json_response({"assignments": [_assignment_safe(r) for r in rows]})
+    # Lazy queue TTL sweep — keeps positions honest even if no worker
+    # ever connects to trigger try_dispatch_queued.
+    await expire_stale_queued()
+
+    out = []
+    for r in rows:
+        item = _assignment_safe(r)
+        if r["status"] == "queued":
+            item["queue_position"] = queue_position(r["id"])
+        prog = PROGRESS.get(r["id"])
+        if prog:
+            item["progress"] = {"stage": prog["stage"], "joined": prog["joined"]}
+        out.append(item)
+    return web.json_response({"assignments": out})
+
+
+async def get_transcript(req: web.Request) -> web.Response:
+    """Live transcript for one assignment. Poll with ?since=<seq> to get
+    only new entries. Also carries progress + summary so the dashboard's
+    call card needs exactly one poll loop."""
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    aid = req.match_info["aid"]
+    row = await db.get_assignment(aid)
+    if row is None:
+        return web.json_response({"error": "not_found"}, status=404)
+    if row["user_id"] != user_row["id"] and user_row["role"] != "admin":
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        since = int(req.query.get("since", "0"))
+    except ValueError:
+        since = 0
+    entries = [e for e in TRANSCRIPTS.get(aid, []) if e["seq"] > since]
+    prog = PROGRESS.get(aid) or {}
+    return web.json_response({
+        "entries": entries,
+        "stage":   prog.get("stage"),
+        "joined":  prog.get("joined", []),
+        "status":  row["status"],
+        "summary": row.get("summary"),
+    })
+
+
+async def say_in_call(req: web.Request) -> web.Response:
+    """Relay a dashboard-typed message into the live meeting. The worker
+    appends it to the intelligence-bus inbox as a synthetic user.message,
+    so the brain replies through the normal turn-taking path and the bot
+    speaks the answer in the room."""
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    aid = req.match_info["aid"]
+    row = await db.get_assignment(aid)
+    if row is None:
+        return web.json_response({"error": "not_found"}, status=404)
+    if row["user_id"] != user_row["id"] and user_row["role"] != "admin":
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    text = (body.get("text") or "").strip()[:500]
+    if not text:
+        return web.json_response({"error": "text required"}, status=400)
+    worker = next((w for w in WORKERS.values()
+                   if w.last_assignment_id == aid and w.state == "busy"), None)
+    if worker is None:
+        return web.json_response({"error": "call_not_active"}, status=409)
+    sender = (user_row.get("display_name")
+              or (user_row.get("email") or "").split("@")[0]
+              or "dashboard")
+    try:
+        await worker.ws.send_str(json.dumps(
+            {"type": "say", "id": aid, "text": text, "from": sender}))
+    except Exception as e:
+        return web.json_response({"error": f"worker send failed: {e}"}, status=502)
+    await db.audit(user_row["id"], "say", {"assignment_id": aid, "chars": len(text)})
+    return web.json_response({"ok": True})
+
+
+async def cancel_assignment(req: web.Request) -> web.Response:
+    """Cancel a QUEUED dispatch (started calls end via /api/recall)."""
+    user_row = await _ensure_user(req)
+    if user_row is None:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    aid = req.match_info["aid"]
+    row = await db.get_assignment(aid)
+    if row is None:
+        return web.json_response({"error": "not_found"}, status=404)
+    if row["user_id"] != user_row["id"] and user_row["role"] != "admin":
+        return web.json_response({"error": "forbidden"}, status=403)
+    if row["status"] != "queued":
+        return web.json_response({"error": "not_queued", "status": row["status"]}, status=409)
+    QUEUE[:] = [q for q in QUEUE if q["id"] != aid]
+    await db.update_assignment_status(aid, "cancelled", {"reason": "user_cancelled"})
+    await db.audit(user_row["id"], "dispatch.cancelled", {"assignment_id": aid})
+    return web.json_response({"ok": True})
 
 
 async def mint_worker_key(req: web.Request) -> web.Response:
@@ -467,17 +676,56 @@ async def worker_ws(req: web.Request) -> web.WebSocketResponse:
                 if t == "hello":
                     worker.name = (obj.get("name") or "")[:80]
                     worker.platform = (obj.get("platform") or "")[:80]
+                    # A brain just came online — see if anyone's in line.
+                    asyncio.create_task(try_dispatch_queued())
                 elif t == "state":
                     new_state = obj.get("state", "idle")
                     if new_state == "idle" and worker.state == "busy" and worker.last_assignment_id:
                         await db.update_assignment_status(worker.last_assignment_id, "ended",
                                                           obj.get("detail"))
+                        PROGRESS.pop(worker.last_assignment_id, None)
                     worker.state = new_state
+                    if new_state == "idle":
+                        asyncio.create_task(try_dispatch_queued())
                 elif t == "status":
                     aid = obj.get("id")
                     event = obj.get("event")
                     if aid and event in ("started", "ended", "failed", "rejected"):
                         await db.update_assignment_status(aid, event, obj.get("detail"))
+                        if event in ("ended", "failed", "rejected"):
+                            PROGRESS.pop(aid, None)
+                elif t == "transcript":
+                    # {"type":"transcript","id":aid,"entry":{kind,speaker,specialist_id,text,ts}}
+                    aid = obj.get("id")
+                    entry = obj.get("entry") or {}
+                    if aid and isinstance(entry, dict) and entry.get("text"):
+                        append_transcript(aid, {
+                            "kind":          entry.get("kind", "bot"),
+                            "speaker":       str(entry.get("speaker") or "")[:80],
+                            "specialist_id": str(entry.get("specialist_id") or "")[:60],
+                            "text":          str(entry.get("text"))[:2000],
+                            "ts":            float(entry.get("ts") or time.time()),
+                        })
+                elif t == "progress":
+                    # {"type":"progress","id":aid,"stage":"accepted|launching|joined:<spec_id>"}
+                    aid = obj.get("id")
+                    stage = str(obj.get("stage") or "")[:60]
+                    if aid and stage:
+                        p = PROGRESS.setdefault(aid, {"stage": "", "joined": [], "ts": 0.0})
+                        if stage.startswith("joined:"):
+                            sid = stage.split(":", 1)[1]
+                            if sid and sid not in p["joined"]:
+                                p["joined"].append(sid)
+                            p["stage"] = "joined"
+                        else:
+                            p["stage"] = stage
+                        p["ts"] = time.time()
+                elif t == "summary":
+                    # {"type":"summary","id":aid,"summary":"...markdown..."}
+                    aid = obj.get("id")
+                    s = obj.get("summary")
+                    if aid and isinstance(s, str) and s.strip():
+                        await db.set_assignment_summary(aid, s.strip())
                 elif t == "pong":
                     pass
                 else:
@@ -543,8 +791,10 @@ def _assignment_safe(row: dict) -> dict:
         "detail":           row.get("detail"),
         "created_at":       row["created_at"].isoformat() if row.get("created_at") else None,
         "started_at":       row["started_at"].isoformat() if row.get("started_at") else None,
+        "dispatched_at":    row["dispatched_at"].isoformat() if row.get("dispatched_at") else None,
         "ended_at":         row["ended_at"].isoformat() if row.get("ended_at") else None,
         "billable_seconds": row.get("billable_seconds"),
+        "summary":          row.get("summary"),
     }
 
 
@@ -581,6 +831,23 @@ def _load_specialists_data() -> list[dict]:
 
 async def on_startup(app: web.Application) -> None:
     await db.run_migrations()
+    # Reload the dispatch queue from the DB — a broker redeploy must not
+    # silently drop people who were waiting in line.
+    try:
+        for row in await db.list_queued_assignments():
+            QUEUE.append({
+                "id":          row["id"],
+                "user_id":     row["user_id"],
+                "meet_url":    row["meet_url"],
+                "specialists": row["specialists"],
+                "brief":       row.get("brief") or "",
+                "mode":        row.get("mode") or "avatar",
+                "created_ts":  row["created_at"].timestamp() if row.get("created_at") else time.time(),
+            })
+        if QUEUE:
+            print(f"[broker] reloaded {len(QUEUE)} queued dispatch(es)", flush=True)
+    except Exception as e:
+        print(f"[broker] queue reload failed: {e}", flush=True)
     print("[broker] db ready", flush=True)
 
 
@@ -647,6 +914,9 @@ def build_app() -> web.Application:
     app.router.add_post("/api/dispatch", dispatch)
     app.router.add_post("/api/recall", recall)
     app.router.add_get("/api/assignments", list_assignments)
+    app.router.add_get("/api/assignments/{aid}/transcript", get_transcript)
+    app.router.add_post("/api/assignments/{aid}/say", say_in_call)
+    app.router.add_post("/api/assignments/{aid}/cancel", cancel_assignment)
     app.router.add_post("/api/worker-keys", mint_worker_key)
     app.router.add_get("/api/worker-keys", list_my_worker_keys)
     app.router.add_post("/api/worker-keys/revoke", revoke_my_worker_key)

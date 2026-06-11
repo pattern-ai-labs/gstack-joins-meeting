@@ -120,15 +120,26 @@ export function DispatchPanel() {
     if (!meetUrl.trim() || picked.size === 0) return;
     setPending(true);
     try {
-      const r = await call<{ assignment_id: string; worker_id: string }>("/api/dispatch", {
+      const r = await call<{ assignment_id: string; worker_id?: string; queued?: boolean; position?: number }>("/api/dispatch", {
         method: "POST",
         body: JSON.stringify({ meetUrl: meetUrl.trim(), specialists: [...picked], brief, mode }),
       });
-      toast.push({
-        kind: "ok",
-        title: `${picked.size} specialist${picked.size === 1 ? "" : "s"} dispatched`,
-        body: `Assignment ${r.assignment_id.slice(0, 12)}… → brain ${r.worker_id}`,
-      });
+      if (r.queued) {
+        // No brain free right now — the broker holds the dispatch in a
+        // queue and fires it automatically when one frees up. The card
+        // above the panel shows live position + a cancel button.
+        toast.push({
+          kind: "ok",
+          title: `You're #${r.position ?? 1} in line`,
+          body: "A brain will pick this up the moment one frees. Watch the card above.",
+        });
+      } else {
+        toast.push({
+          kind: "ok",
+          title: `${picked.size} specialist${picked.size === 1 ? "" : "s"} dispatched`,
+          body: `Assignment ${r.assignment_id.slice(0, 12)}… → brain ${r.worker_id}`,
+        });
+      }
       // optimistic: clear pick & refresh
       setPicked(new Set());
       refreshWorkers(); refreshAssignments();

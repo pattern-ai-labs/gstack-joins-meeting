@@ -134,6 +134,25 @@ falls apart):**
   (one person speaks at a time) instead of three bots all jumping
   in at once.
 
+- **Dashboard-typed messages.** Inbox lines with `"source":
+  "dashboard"` were typed into the hosted dashboard's "say" box, not
+  spoken in the room (their `speaker` ends in `(dashboard)`). Treat
+  them exactly like a spoken `user.message`: pick ONE specialist by
+  the rules above and reply through that outbox — the bot voices your
+  reply in the meeting and the dashboard transcript shows both sides.
+
+- **Summary requests (post-call notes).** When a call ends, the
+  worker appends `{"event":"summary.request","assignment_id":...,
+  "specialists":[...],"write_to":"/tmp/gstack-intelligence-<uid>/summaries/<aid>.md"}`
+  to the inbox. Write markdown call notes to the `write_to` path
+  (plain Write, whole file at once). Shape: one short section per
+  dispatched specialist, in their voice, titled with their name —
+  what they heard, their verdict, 1-3 concrete next steps. 150-300
+  words total, no preamble. Scan the recent inbox/outbox traffic for
+  what was actually said; if the call was silent, write two lines
+  saying so. The worker watches that path for ~2 minutes and ships
+  it to the hosted dashboard as the user's "call notes" card.
+
 #### 4. Other outbox actions (use sparingly)
 
 ```bash
