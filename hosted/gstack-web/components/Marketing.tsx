@@ -85,9 +85,16 @@ function Hero() {
         </h1>
 
         <p className="text-[17px] sm:text-[19px] text-[var(--color-fg-soft)] max-w-2xl mx-auto mt-7 leading-relaxed anim-up" style={{ animationDelay: "140ms" }}>
-          Paste a Meet URL. Pick specialists.
+          The specialists from{" "}
+          <a
+            href="https://github.com/garrytan/gstack"
+            target="_blank" rel="noopener noreferrer"
+            className="text-[var(--color-accent)] underline underline-offset-4 decoration-[var(--color-accent-ring)]"
+          >Garry Tan's gstack</a>
+          {" "}— a blunt CEO, a paranoid CSO, a skeptical QA Lead — show up in
+          your Google Meet as real participants: own tile, own voice, in character.
           <br className="hidden sm:inline" />
-          They join in character — with a 3D avatar and their own voice.
+          <span className="text-[var(--color-fg)]"> Not a notetaker. A team that talks back.</span>
         </p>
 
         <div className="flex items-center justify-center gap-3 mt-10 anim-up" style={{ animationDelay: "220ms" }}>

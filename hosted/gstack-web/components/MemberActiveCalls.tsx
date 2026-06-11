@@ -169,8 +169,10 @@ function CallCard({ a, onEnd }: { a: Assignment; onEnd: () => void }) {
       </div>
 
       {/* progress stepper — fills the dead air between dispatch and the
-          bots' tiles appearing in the Meet. Collapses once everyone's in. */}
-      {!allJoined && (
+          bots' tiles appearing in the Meet. Collapses once everyone's in.
+          Only rendered when the broker reports progress at all (an old
+          broker without the progress channel would pin it at step 1). */}
+      {a.progress && !allJoined && (
         <div className="px-4 pb-3 flex items-center gap-2 text-[11px] mono">
           {STAGES.map((s, i) => {
             const done = stageIdx > i || (s === "joined" && allJoined);
@@ -208,6 +210,9 @@ function Transcript({ aid, specialists }: { aid: string; specialists: string[] }
   const [open, setOpen] = useState(true);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  // 404 = broker predates the transcript channel — remove the whole
+  // section instead of showing a dead panel + erroring say box.
+  const [unsupported, setUnsupported] = useState(false);
   const sinceRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -221,7 +226,13 @@ function Transcript({ aid, specialists }: { aid: string; specialists: string[] }
         if (!live || r.entries.length === 0) return;
         sinceRef.current = r.entries[r.entries.length - 1].seq;
         setEntries((cur) => [...cur, ...r.entries].slice(-200));
-      } catch { /* broker hiccup — next tick retries */ }
+      } catch (e) {
+        if ((e as { status?: number }).status === 404) {
+          if (live) setUnsupported(true);
+          clearInterval(id);
+        }
+        /* other errors: broker hiccup — next tick retries */
+      }
     }, 2500);
     return () => { live = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -246,6 +257,8 @@ function Transcript({ aid, specialists }: { aid: string; specialists: string[] }
       setSending(false);
     }
   }
+
+  if (unsupported) return null;
 
   return (
     <div className="border-t border-[var(--color-border)]">
