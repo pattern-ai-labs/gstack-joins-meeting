@@ -33,9 +33,11 @@ export function MobileHeader() {
     <>
       <header className="md:hidden sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-bg)]/90 backdrop-blur-md">
         <div className="px-4 h-14 flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
-            <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-fg)] flex items-center justify-center font-bold text-sm">G</span>
-            <span className="font-semibold text-[14px]">gstack</span>
+          <Link href="/" className="flex items-center gap-1.5" onClick={() => setOpen(false)}>
+            <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-fg)] flex items-center justify-center font-bold text-sm mr-0.5">G</span>
+            <span className="font-semibold text-[14px] text-[var(--color-accent)]">gstack</span>
+            <span className="text-[11px] font-bold" style={{ color: "#ff6b2b" }}>✕</span>
+            <span className="font-semibold text-[14px]" style={{ color: "#f4eedd" }}>agentcall</span>
           </Link>
           <MobileStatus />
           <div className="ml-auto flex items-center gap-2">

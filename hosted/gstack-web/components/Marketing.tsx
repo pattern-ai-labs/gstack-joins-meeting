@@ -1,29 +1,10 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { SignInButton, SignedIn, SignedOut } from "@/lib/auth";
 import { isDevAuth } from "@/lib/auth-mode";
-
-const SPECIALISTS = [
-  { id: "office-hours",       name: "YC Office Hours",   role: "Partner",            glyph: "YC",  accent: "#ff6b2b" },
-  { id: "plan-ceo-review",    name: "CEO",               role: "Strategy",           glyph: "♛",   accent: "#ffb020" },
-  { id: "plan-eng-review",    name: "Eng Manager",       role: "Architecture",       glyph: "⎇",   accent: "#5ee1b5" },
-  { id: "plan-design-review", name: "Senior Designer",   role: "Design rubric",      glyph: "◈",   accent: "#d68cff" },
-  { id: "plan-devex-review",  name: "DX Lead",           role: "Developer XP",       glyph: "❮❯",  accent: "#7dd3fc" },
-  { id: "design-consultation",name: "Design Partner",    role: "System direction",   glyph: "✦",   accent: "#f0abfc" },
-  { id: "design-shotgun",     name: "Design Explorer",   role: "Mockup variants",    glyph: "⁂",   accent: "#fb7185" },
-  { id: "design-html",        name: "Design Engineer",   role: "Production HTML",    glyph: "</>", accent: "#a78bfa" },
-  { id: "review",             name: "Staff Engineer",    role: "Code review",        glyph: "⌘",   accent: "#00e5ff" },
-  { id: "investigate",        name: "Debugger",          role: "Root-cause",         glyph: "⌕",   accent: "#fde047" },
-  { id: "design-review",      name: "Designer Who Codes",role: "Live UI audit",      glyph: "◐",   accent: "#f472b6" },
-  { id: "devex-review",       name: "DX Tester",         role: "Run → feel",         glyph: "▤",   accent: "#60a5fa" },
-  { id: "qa",                 name: "QA Lead",           role: "Tests + edges",      glyph: "✓",   accent: "#4ade80" },
-  { id: "cso",                name: "CSO",               role: "OWASP threat model", glyph: "⛨",   accent: "#f87171" },
-  { id: "ship",               name: "Release Engineer",  role: "PR + deploy",        glyph: "▲",   accent: "#34d399" },
-  { id: "land-and-deploy",    name: "Deploy Engineer",   role: "Merge + verify",     glyph: "⇧",   accent: "#22d3ee" },
-  { id: "canary",             name: "SRE",               role: "Logs + rollback",    glyph: "☀",   accent: "#fbbf24" },
-  { id: "retro",              name: "Retro Facilitator", role: "Shipped / slipped",  glyph: "↻",   accent: "#c4b5fd" },
-  { id: "spec",               name: "Spec Partner",      role: "5-phase interrogator", glyph: "§", accent: "#a3e635" },
-];
+import { SPECIALISTS, type MarketingSpecialist } from "@/lib/specialists-static";
+import { SpecialistDetailModal } from "./SpecialistDetailModal";
 
 export function Marketing() {
   return (
@@ -161,11 +142,15 @@ function BackgroundGlow() {
  * Per user feedback: the old "dashboard your team will use" product
  * screenshot was long and not the most compelling visual. People want
  * to SEE the cast first — who shows up, what they do. The grid below
- * mirrors the dashboard's Specialists section: every persona on one
- * page, each clickable to GitHub for the source prompt. Replaces the
- * scrolling marquee too — static beats motion when the user actually
- * wants to read names. */
+ * mirrors the dashboard's Specialists section.
+ *
+ * Clicking a tile used to open github.com/garrytan/gstack/blob/main/<id>.md,
+ * which 404s (those ids aren't real filenames in his repo). Now each tile
+ * opens a SpecialistDetailModal with the persona narrative — what it does,
+ * when to call it, its voice — sourced from lib/specialists-static.ts so
+ * the signed-out landing needs no auth-gated API call. */
 function SpecialistGrid() {
+  const [selected, setSelected] = useState<MarketingSpecialist | null>(null);
   return (
     <section className="py-20 border-t border-[var(--color-border)]">
       <div className="max-w-5xl mx-auto px-6">
@@ -181,18 +166,17 @@ function SpecialistGrid() {
               target="_blank" rel="noopener noreferrer"
               className="text-[var(--color-accent)] underline underline-offset-4"
             >Garry Tan's gstack</a>
-            {" "}— adapted to a real voice agent with a distinct voice and avatar.
+            {" "}— adapted to a real voice agent. Tap any one to see what it does.
           </p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {SPECIALISTS.map((s) => (
-            <a
+            <button
               key={s.id}
-              href={`https://github.com/garrytan/gstack/blob/main/${s.id}.md`}
-              target="_blank" rel="noopener noreferrer"
-              className="surface p-4 flex items-center gap-3 hover:bg-[var(--color-panel-2)] transition group"
-              title={`Open ${s.name} source prompt on GitHub`}
+              onClick={() => setSelected(s)}
+              className="surface p-4 flex items-center gap-3 hover:bg-[var(--color-panel-2)] transition group text-left"
+              title={`${s.name} — ${s.role}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -207,20 +191,13 @@ function SpecialistGrid() {
                 <div className="font-medium text-[13px] truncate">{s.name}</div>
                 <div className="text-[11px] text-[var(--color-muted)] truncate">{s.role}</div>
               </div>
-              <span className="text-[var(--color-muted)] group-hover:text-[var(--color-fg)] text-[12px] opacity-0 group-hover:opacity-100 transition">↗</span>
-            </a>
+              <span className="text-[var(--color-muted)] group-hover:text-[var(--color-fg)] text-[13px] opacity-0 group-hover:opacity-100 transition">→</span>
+            </button>
           ))}
         </div>
-
-        <div className="text-center mt-8">
-          <Link
-            href="/specialists"
-            className="btn btn-outline px-5 py-2.5 text-[13px]"
-          >
-            Browse all specialists →
-          </Link>
-        </div>
       </div>
+
+      <SpecialistDetailModal specialist={selected} onClose={() => setSelected(null)} />
     </section>
   );
 }
@@ -255,6 +232,29 @@ function HowItWorks() {
             kicker="real meeting participants"
           />
         </div>
+
+        {/* bring-your-brain note — the bots run on your own coding-agent
+            session, so your context + data stay on your machine and our
+            side burns no credits. Links to the BYOB explainer. */}
+        <Link
+          href="/byob"
+          className="mt-5 surface px-5 py-4 flex items-start sm:items-center gap-3 hover:bg-[var(--color-panel-2)] transition group"
+        >
+          <span
+            className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[16px]"
+            style={{ background: "var(--color-accent-soft)" }}
+          >🧠</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[14px] font-medium">
+              Bring your own brain
+              <span className="text-[var(--color-muted)] font-normal"> — your coding-agent session powers the bots.</span>
+            </div>
+            <div className="text-[12.5px] text-[var(--color-fg-soft)] mt-0.5">
+              Your context and data stay in your session, on your machine. No credits burned on our side.
+            </div>
+          </div>
+          <span className="text-[var(--color-muted)] group-hover:text-[var(--color-fg)] text-[13px] shrink-0">→</span>
+        </Link>
       </div>
     </section>
   );

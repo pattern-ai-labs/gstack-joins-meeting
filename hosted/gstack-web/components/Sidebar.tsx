@@ -31,10 +31,13 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex w-56 shrink-0 h-screen sticky top-0 border-r border-[var(--color-border)] flex-col">
       <div className="px-5 pt-5 pb-6">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-fg)] flex items-center justify-center font-bold text-sm shadow-[0_0_0_3px_var(--color-accent-soft)]">G</span>
-          <span className="text-[15px] font-semibold tracking-tight">gstack</span>
-          <span className="text-[10px] mono text-[var(--color-muted)] mt-1">v2</span>
+        {/* gstack × agentcall lockup — matches the landing topbar/footer.
+            G tile + wordmark at 14px fits the 224px sidebar. */}
+        <Link href="/" className="flex items-center gap-1.5 group">
+          <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-fg)] flex items-center justify-center font-bold text-sm shadow-[0_0_0_3px_var(--color-accent-soft)] mr-0.5">G</span>
+          <span className="text-[14px] font-semibold tracking-tight text-[var(--color-accent)]">gstack</span>
+          <span className="text-[11px] font-bold" style={{ color: "#ff6b2b" }}>✕</span>
+          <span className="text-[14px] font-semibold tracking-tight" style={{ color: "#f4eedd" }}>agentcall</span>
         </Link>
       </div>
 
