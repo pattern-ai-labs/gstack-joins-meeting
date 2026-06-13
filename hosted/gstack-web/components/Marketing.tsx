@@ -359,7 +359,7 @@ function ThanksGarry() {
   // (NOT "we just shipped"). Keeps the verb tense first-person past so
   // it works for anyone clicking the button.
   const tweet = encodeURIComponent(
-    "I tried @garrytan's gstack specialists in a real Google Meet — they joined as voice bots and reviewed my startup pitch in character. Wild. https://gstack-joins-meeting.vercel.app"
+    "I tried @garrytan's gstack specialists in a real Google Meet — they joined as voice bots and reviewed my startup pitch in character. Wild. https://gstack-meeting.com"
   );
   return (
     <section className="py-24 border-t border-[var(--color-border)] bg-[var(--color-bg-soft)] relative overflow-hidden">

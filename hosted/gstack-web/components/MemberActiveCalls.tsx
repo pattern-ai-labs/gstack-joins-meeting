@@ -340,7 +340,7 @@ function NotesCard({ a, onDismiss }: { a: Assignment; onDismiss: () => void }) {
   const toast = useToast();
   const summary = a.summary ?? "";
   const tweet = encodeURIComponent(
-    "Just had @garrytan's gstack specialists join my Google Meet and leave me written call notes. Wild. https://gstack-joins-meeting.vercel.app",
+    "Just had @garrytan's gstack specialists join my Google Meet and leave me written call notes. Wild. https://gstack-meeting.com",
   );
   return (
     <div className="surface relative overflow-hidden anim-up">
