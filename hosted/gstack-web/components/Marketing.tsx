@@ -12,6 +12,7 @@ export function Marketing() {
       <Topbar />
       <Hero />
       <HowItWorks />
+      <BringYourBrain />
       <SpecialistGrid />
       <InstallBlock />
       <WhyExists />
@@ -232,29 +233,56 @@ function HowItWorks() {
             kicker="real meeting participants"
           />
         </div>
+      </div>
+    </section>
+  );
+}
 
-        {/* bring-your-brain note — the bots run on your own coding-agent
-            session, so your context + data stay on your machine and our
-            side burns no credits. Links to the BYOB explainer. */}
-        <Link
-          href="/byob"
-          className="mt-5 surface px-5 py-4 flex items-start sm:items-center gap-3 hover:bg-[var(--color-panel-2)] transition group"
-        >
-          <span
-            className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[16px]"
-            style={{ background: "var(--color-accent-soft)" }}
-          >🧠</span>
-          <div className="flex-1 min-w-0">
-            <div className="text-[14px] font-medium">
-              Bring your own brain
-              <span className="text-[var(--color-muted)] font-normal"> — your coding-agent session powers the bots.</span>
+/* ─── bring your own brain (dedicated section) ───────────────────────
+ * Promoted from a small note under the steps to its own band. The BYOB
+ * model is a real differentiator — the bots run on the visitor's own
+ * coding-agent session, so their context + data never leave their
+ * machine and our side burns no Anthropic credits. It's also the
+ * pressure valve when the shared demo pool is busy. */
+function BringYourBrain() {
+  const points = [
+    { title: "Your data stays home", body: "The bots run on your machine. Your repo, your context, your conversation — none of it touches our servers." },
+    { title: "No credits burned", body: "Your coding-agent session is the brain. You're not paying us for tokens, and we're not paying for yours." },
+    { title: "Always available", body: "When the shared demo pool is busy, your own brain is the fallback — you're never blocked." },
+  ];
+  return (
+    <section id="byob" className="py-20 border-t border-[var(--color-border)]">
+      <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-2 gap-10 lg:gap-14 items-center">
+        <div>
+          <div className="label-cap mb-3">Bring your own brain</div>
+          <h2 className="text-[32px] sm:text-[40px] font-semibold tracking-tight leading-[1.1] mb-5">
+            Your coding agent
+            <br className="hidden sm:inline" /> is the brain.
+          </h2>
+          <p className="text-[15px] text-[var(--color-fg-soft)] leading-relaxed mb-4">
+            Every specialist is powered by a coding-agent session you already run —
+            Claude Code, Codex, or Cursor. It hears the meeting, thinks, and speaks back
+            in character, all from your machine.
+          </p>
+          <p className="text-[15px] text-[var(--color-fg-soft)] leading-relaxed mb-7">
+            That means the work — and your data — stays on your side. We just bridge it to the call.
+          </p>
+          <Link href="/byob" className="btn btn-primary px-5 py-3 text-[13px]">
+            How bring-your-brain works →
+          </Link>
+        </div>
+
+        <div className="space-y-3">
+          {points.map((p) => (
+            <div key={p.title} className="surface p-4 flex gap-3.5">
+              <span className="shrink-0 w-1 rounded-full bg-[var(--color-accent)]" style={{ boxShadow: "0 0 14px var(--color-accent-ring)" }} />
+              <div>
+                <div className="font-medium text-[14px] mb-1">{p.title}</div>
+                <div className="text-[12.5px] text-[var(--color-fg-soft)] leading-snug">{p.body}</div>
+              </div>
             </div>
-            <div className="text-[12.5px] text-[var(--color-fg-soft)] mt-0.5">
-              Your context and data stay in your session, on your machine. No credits burned on our side.
-            </div>
-          </div>
-          <span className="text-[var(--color-muted)] group-hover:text-[var(--color-fg)] text-[13px] shrink-0">→</span>
-        </Link>
+          ))}
+        </div>
       </div>
     </section>
   );
