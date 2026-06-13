@@ -13,7 +13,7 @@
 #   fly deploy --config hosted/broker/fly.toml --dockerfile hosted/broker/Dockerfile
 
 app           = "gstack-broker"
-primary_region = "syd"  # Sydney — matches the AP region of the Postgres + closest to AP users
+primary_region = "iad"  # US-East (Ashburn) — co-located with Postgres (gstack-db-us); closest to our US user base
 
 [build]
   # Resolved relative to this fly.toml. Build CONTEXT is overridden on the
