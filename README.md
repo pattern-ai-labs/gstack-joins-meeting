@@ -151,6 +151,24 @@ Avatar mode tunnels a local `python -m http.server` on `:3000` (serving `avatar-
 
 ---
 
+## The characters
+
+Each specialist's face is a **[DiceBear](https://www.dicebear.com) `lorelei` character** — the illustrated head you see on the bot's video tile and across the dashboard. They're generated once by [`avatars/gen.py`](./avatars/gen.py) and committed as static SVGs:
+
+- **Deterministic.** The seed is the specialist's `id`, so the CSO always gets the same face and the QA Lead always gets theirs — across reinstalls, machines, and the hosted demo. No randomness, no drift.
+- **On-brand.** Each character sits on its specialist's accent color (the CSO's alarm red, the SRE's amber) so the roster reads as one set.
+- **Two files each.** `avatars/<id>.svg` is the DiceBear character; `avatars/glyph-<id>.svg` is a monospace-glyph fallback (e.g. `✓` for QA, `⛨` for CSO) used if the character ever fails to load.
+
+Regenerate the whole roster after editing the seed list:
+
+```bash
+python3 avatars/gen.py        # refetches every character + rewrites glyph fallbacks
+```
+
+Art credit: the `lorelei` style is by **[Lisa Wischofsky](https://www.instagram.com/lischi_art/)**, licensed **CC BY 4.0**; the DiceBear toolkit itself is MIT. See [Thanks](#avatars-credit) below.
+
+---
+
 ## Troubleshooting
 
 The common failure modes, in roughly the order you'll hit them:
@@ -186,5 +204,8 @@ If you ship something on top of this, tell us what you broke. PRs welcome — se
 
 MIT. Same as upstream gstack and AgentCall.
 
+<a id="avatars-credit"></a>
+
 - [garrytan/gstack](https://github.com/garrytan/gstack) — the specialist personas. MIT.
 - [AgentCall](https://agentcall.dev) — the meeting-bot platform. Commercial; free tier covers prototyping.
+- [DiceBear](https://www.dicebear.com) — avatar toolkit (MIT). The `lorelei` character art is by **[Lisa Wischofsky](https://www.instagram.com/lischi_art/)**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
